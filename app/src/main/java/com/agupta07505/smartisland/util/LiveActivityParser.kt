@@ -32,7 +32,27 @@ object LiveActivityParser {
         "com.rapido.passenger",        // Rapido
         "com.olacabs.customer",        // Ola
         "com.dunzo.user",              // Dunzo
-        "com.Dominos"                  // Domino's
+        "com.Dominos",                 // Domino's
+        "com.dd.doordash",             // DoorDash
+        "com.grubhub.android",         // Grubhub
+        "com.ubereats.android",        // Uber Eats
+        "com.lyft.android",            // Lyft
+        "com.global.foodpanda.app",    // Foodpanda
+        "com.deliveroo.orderapp",      // Deliveroo
+        "com.instacart.app",           // Instacart
+        "com.mcdonalds.app",            // McDonald's
+        "com.burgerking.app",          // Burger King
+        "com.starbucks.mobilecard",    // Starbucks
+        "com.kfc.order",               // KFC
+        "com.pizzahut.app",            // Pizza Hut
+        "com.heinengo",                // Flink
+        "com.glovoapp.customer",       // Glovo
+        "com.talu.android",            // Talabat
+        "com.careem.food",             // Careem
+        "com.gojek.app",               // Gojek
+        "com.grabtaxi.passenger",      // Grab
+        "com.bee.cargo",               // Bee
+        "com.yandex.eda"               // Yandex Eats
     )
 
     private val ETA_PATTERN = Pattern.compile("(\\d+)(?:\\s*-\\s*\\d+)?\\s*(?:mins?|minutes?|min|m)\\b", Pattern.CASE_INSENSITIVE)
@@ -53,6 +73,26 @@ object LiveActivityParser {
             "com.olacabs.customer" -> 0xFF84CC16L
             "com.dunzo.user" -> 0xFF00B259L
             "com.Dominos" -> 0xFF006491L
+            "com.dd.doordash" -> 0xFFFF3008L
+            "com.grubhub.android" -> 0xFFF63440L
+            "com.ubereats.android" -> 0xFF06C167L
+            "com.lyft.android" -> 0xFFFFD60AL
+            "com.global.foodpanda.app" -> 0xFFFF6090L
+            "com.deliveroo.orderapp" -> 0xFF00CCBCL
+            "com.instacart.app" -> 0xFF43B02AL
+            "com.mcdonalds.app" -> 0xFFFFC72CL
+            "com.burgerking.app" -> 0xFFD62300L
+            "com.starbucks.mobilecard" -> 0xFF00704AL
+            "com.kfc.order" -> 0xFFE4002BL
+            "com.pizzahut.app" -> 0xFFE2231AL
+            "com.heinengo" -> 0xFFFF4D4DL
+            "com.glovoapp.customer" -> 0xFFFFC043L
+            "com.talu.android" -> 0xFFFF8C00L
+            "com.careem.food" -> 0xFF22C55EL
+            "com.gojek.app" -> 0xFF00AA13L
+            "com.grabtaxi.passenger" -> 0xFF00B14FL
+            "com.bee.cargo" -> 0xFFFFC107L
+            "com.yandex.eda" -> 0xFFFF1A4EL
             else -> 0xFF38BDF8L
         }
     }

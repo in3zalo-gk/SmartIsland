@@ -77,7 +77,10 @@ data class SmartIslandSettings(
     val pillSwipeDownAction: String = "Expand",
     val pillSwipeLeftAction: String = "PreviousNotification",
     val pillSwipeRightAction: String = "NextNotification",
-    val circlePosition: String = CIRCLE_POSITION_RIGHT
+    val circlePosition: String = CIRCLE_POSITION_RIGHT,
+    val enablePet: Boolean = false,
+    val petColor: Long = 0xFFFF7043L,
+    val petInsideIsland: Boolean = true
 ) {
     fun toJson(appVersion: String = ""): String {
         val root = JSONObject()
@@ -171,6 +174,9 @@ data class SmartIslandSettings(
         settingsObj.put("pillSwipeLeftAction", pillSwipeLeftAction)
         settingsObj.put("pillSwipeRightAction", pillSwipeRightAction)
         settingsObj.put("circlePosition", circlePosition)
+        settingsObj.put("enablePet", enablePet)
+        settingsObj.put("petColor", petColor)
+        settingsObj.put("petInsideIsland", petInsideIsland)
 
         root.put("settings", settingsObj)
         return root.toString(2)
@@ -323,7 +329,10 @@ data class SmartIslandSettings(
                 pillSwipeRightAction = obj.optString("pillSwipeRightAction", defaults.pillSwipeRightAction),
                 circlePosition = obj.optString("circlePosition", defaults.circlePosition).let {
                     if (it == CIRCLE_POSITION_LEFT || it == CIRCLE_POSITION_RIGHT) it else defaults.circlePosition
-                }
+                },
+                enablePet = obj.optBoolean("enablePet", defaults.enablePet),
+                petColor = safeColor("petColor", defaults.petColor),
+                petInsideIsland = obj.optBoolean("petInsideIsland", defaults.petInsideIsland)
             )
         }
     }

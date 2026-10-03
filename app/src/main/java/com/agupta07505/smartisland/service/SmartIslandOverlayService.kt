@@ -36,6 +36,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.agupta07505.smartisland.MainActivity
 import com.agupta07505.smartisland.R
 import com.agupta07505.smartisland.data.INotificationRepository
+import com.agupta07505.smartisland.data.NotificationStatsRepository
 import com.agupta07505.smartisland.data.SmartIslandCommand
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.data.SmartIslandSettingsRepository
@@ -63,6 +64,7 @@ class SmartIslandOverlayService : AccessibilityService() {
     private lateinit var windowManager: WindowManager
     @Inject lateinit var repository: SmartIslandSettingsRepository
     @Inject lateinit var notificationRepository: INotificationRepository
+    @Inject lateinit var statsRepository: NotificationStatsRepository
     private var islandView: ComposeView? = null
     private val overlayOwners = OverlayViewTreeOwners()
     private lateinit var systemEventReceiver: SystemEventReceiver
@@ -833,6 +835,11 @@ class SmartIslandOverlayService : AccessibilityService() {
         }
         if (notification.mode != com.agupta07505.smartisland.model.IslandMode.Music) {
             notificationRepository.removeNotificationsForPackage(notification.packageName)
+        }
+        serviceScope.launch {
+            runSuspendCatchingLogged(TAG, "Failed to record tap stats") {
+                statsRepository.recordTap()
+            }
         }
         viewModel.collapse()
     }

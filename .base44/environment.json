@@ -1,0 +1,7 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "echo 'Android app — no web preview available'",
+  "secrets": [],
+  "notes": "Native Android app (Kotlin/Jetpack Compose). Cannot run in a web preview. Requires Android SDK + Gradle to build. No external secrets required for development."
+}
