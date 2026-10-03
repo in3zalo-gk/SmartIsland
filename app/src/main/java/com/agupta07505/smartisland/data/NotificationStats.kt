@@ -51,7 +51,7 @@ class NotificationStatsRepository(private val context: Context) {
                 prefs[Keys.FirstUseTimestamp] = System.currentTimeMillis()
             }
             val perAppJson = prefs[Keys.PerAppStats] ?: "{}"
-            val perApp = parsePerAppStats(perAppJson)
+            val perApp = parsePerAppStats(perAppJson).toMutableMap()
             val key = "$packageName|$appName"
             val existing = perApp[key] ?: AppStat(packageName = packageName, appName = appName)
             perApp[key] = existing.copy(count = existing.count + 1, lastSeen = System.currentTimeMillis())
