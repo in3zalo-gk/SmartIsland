@@ -16,6 +16,8 @@ import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.data.SmartIslandSettingsRepository
 import com.agupta07505.smartisland.model.IslandMode
 import com.agupta07505.smartisland.model.IslandNotification
+import com.agupta07505.smartisland.model.IslandPetState
+import com.agupta07505.smartisland.model.PetMood
 import com.agupta07505.smartisland.util.runSuspendCatchingLogged
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -62,6 +64,7 @@ class IslandViewModel(
     val selectedIndex = MutableStateFlow(0)
     val isLocked = MutableStateFlow(false)
     val isInputActive = MutableStateFlow(false)
+    val petState = MutableStateFlow(IslandPetState())
 
     val mode: StateFlow<IslandMode> = combine(visibleNotifications, selectedIndex) { list, idx ->
         list.getOrNull(idx)?.mode ?: IslandMode.Empty
@@ -135,6 +138,43 @@ class IslandViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            runSuspendCatchingLogged(TAG, "Pet-mood auto-revert failed") {
+                petState.collect { state ->
+                    if (state.shouldRevertToIdle()) {
+                        delay(100L)
+                        if (petState.value.mood == state.mood) {
+                            petState.value = IslandPetState(mood = PetMood.Idle)
+                        }
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            runSuspendCatchingLogged(TAG, "Pet-mode-reaction collector failed") {
+                mode.collect { islandMode ->
+                    if (settings.value.enablePet) {
+                        val petMood = when (islandMode) {
+                            IslandMode.Battery -> {
+                                val title = visibleNotifications.value.getOrNull(selectedIndex.value)?.title?.lowercase() ?: ""
+                                if (title.contains("low")) PetMood.LowBattery else PetMood.Charging
+                            }
+                            IslandMode.Bluetooth -> PetMood.BluetoothConnected
+                            IslandMode.Music -> PetMood.Music
+                            IslandMode.IncomingCall -> PetMood.Calling
+                            IslandMode.DownloadUpload -> PetMood.Installing
+                            IslandMode.Hotspot -> PetMood.Hotspot
+                            IslandMode.Flashlight -> PetMood.Flashlight
+                            IslandMode.Empty -> PetMood.Idle
+                            else -> PetMood.Happy
+                        }
+                        if (petMood != PetMood.Idle || petState.value.mood != PetMood.Tapped) {
+                            petState.value = IslandPetState(mood = petMood)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fun expand() {
@@ -179,6 +219,10 @@ class IslandViewModel(
         if (expanded.value) {
             startAutoCollapseTimer()
         }
+    }
+
+    fun setPetMood(mood: PetMood) {
+        petState.value = IslandPetState(mood = mood, moodTimestamp = System.currentTimeMillis())
     }
 
     fun setSelectedNotificationIndex(index: Int) {

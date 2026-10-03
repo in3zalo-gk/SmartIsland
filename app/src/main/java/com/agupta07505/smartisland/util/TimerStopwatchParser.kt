@@ -37,7 +37,17 @@ object TimerStopwatchParser {
         "com.hybrid.stopwatch",
         "com.sportstracklive.stopwatch",
         "com.jee.timer",
-        "com.clover.timer"
+        "com.clover.timer",
+        "com.lge.clock",
+        "com.samsung.android.app.clockpackage",
+        "me.zhanghai.android.timer",
+        "com.gmail.albertpaul.timer",
+        "com.jakethandy.stopwatch",
+        "com.zdworks.android.toolbox",
+        "com.apkextractor.timer",
+        "com.stopwatchpro.timer",
+        "com.multiinterval.timer",
+        "com.infomaze.timer"
     )
 
     private val TIMER_KEYWORDS = listOf(
