@@ -27,6 +27,7 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.dp
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
 import androidx.lifecycle.ViewModelProvider
@@ -42,6 +43,8 @@ import com.agupta07505.smartisland.data.SmartIslandSettingsRepository
 import com.agupta07505.smartisland.model.IslandNotification
 import com.agupta07505.smartisland.ui.IslandViewModel
 import com.agupta07505.smartisland.ui.OverlayIsland
+import com.agupta07505.smartisland.ui.PixiPetEvent
+import com.agupta07505.smartisland.ui.PixiPetOverlay
 import com.agupta07505.smartisland.ui.expanded.sendIntentWithOptions
 import com.agupta07505.smartisland.util.runCatchingLogged
 import com.agupta07505.smartisland.util.runSuspendCatchingLogged
@@ -64,6 +67,11 @@ class SmartIslandOverlayService : AccessibilityService() {
     @Inject lateinit var repository: SmartIslandSettingsRepository
     @Inject lateinit var notificationRepository: INotificationRepository
     private var islandView: ComposeView? = null
+    private var petView: ComposeView? = null
+    private var petParams: WindowManager.LayoutParams? = null
+    private val petEvents = MutableStateFlow<PixiPetEvent>(PixiPetEvent.Idle)
+    private var petOwners: OverlayViewTreeOwners? = null
+    private var petPowerReceiverRegistered = false
     private val overlayOwners = OverlayViewTreeOwners()
     private lateinit var systemEventReceiver: SystemEventReceiver
     private lateinit var viewModel: IslandViewModel
@@ -110,6 +118,17 @@ class SmartIslandOverlayService : AccessibilityService() {
                 android.util.Log.e(TAG, "Unhandled overlay coroutine failure", error)
             }
     )
+
+    private val petPowerReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (destroyed) return
+            when (intent.action) {
+                Intent.ACTION_POWER_CONNECTED -> petEvents.value = PixiPetEvent.Charge
+                Intent.ACTION_BATTERY_LOW -> petEvents.value = PixiPetEvent.BatteryLow
+                Intent.ACTION_BATTERY_OKAY -> petEvents.value = PixiPetEvent.Idle
+            }
+        }
+    }
 
     // Monitor screen state and unlock events to show/hide the island accordingly
     private val screenStateReceiver = object : android.content.BroadcastReceiver() {
@@ -275,8 +294,14 @@ class SmartIslandOverlayService : AccessibilityService() {
                     if (destroyed) return@collect
                     if (!settings.enabled) {
                         stopOverlaySession()
+                        removePetWindow()
                     } else {
                         startOverlaySession(settings)
+                        if (settings.enableVirtualPet) {
+                            ensurePetWindow(settings)
+                        } else {
+                            removePetWindow()
+                        }
                     }
                 }
             }
@@ -323,6 +348,45 @@ class SmartIslandOverlayService : AccessibilityService() {
                     updateWindowLayoutParams(isWindowExpanded, viewModel.settings.value)
                 }
             }
+        }
+
+        // Pet: react to notifications and downloads
+        serviceScope.launch {
+            runSuspendCatchingLogged(TAG, "Pet notification collector failed") {
+                notificationRepository.notifications.collect { list ->
+                    if (destroyed) return@collect
+                    if (list.isEmpty()) {
+                        petEvents.value = PixiPetEvent.Idle
+                    } else {
+                        val download = list.firstOrNull {
+                            it.mode == com.agupta07505.smartisland.model.IslandMode.DownloadUpload
+                        }
+                        if (download != null && download.progressMax > 0) {
+                            petEvents.value = PixiPetEvent.Download(
+                                download.progress * 100 / download.progressMax
+                            )
+                        } else {
+                            petEvents.value = PixiPetEvent.Notification
+                        }
+                    }
+                }
+            }
+        }
+
+        // Pet: react to charging / battery events
+        runCatchingLogged(TAG, "registerPetPowerReceiver failed") {
+            val petFilter = IntentFilter().apply {
+                addAction(Intent.ACTION_POWER_CONNECTED)
+                addAction(Intent.ACTION_BATTERY_LOW)
+                addAction(Intent.ACTION_BATTERY_OKAY)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(petPowerReceiver, petFilter, Context.RECEIVER_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                registerReceiver(petPowerReceiver, petFilter)
+            }
+            petPowerReceiverRegistered = true
         }
     }
 
@@ -379,6 +443,13 @@ class SmartIslandOverlayService : AccessibilityService() {
             }
             screenStateReceiverRegistered = false
         }
+        if (petPowerReceiverRegistered) {
+            runCatchingLogged(TAG, "unregisterReceiver petPowerReceiver failed") {
+                unregisterReceiver(petPowerReceiver)
+            }
+            petPowerReceiverRegistered = false
+        }
+        removePetWindow()
         if (torchCallbackRegistered) {
             runCatchingLogged(TAG, "unregisterTorchCallback failed") {
                 val cameraManager = getSystemService(Context.CAMERA_SERVICE) as? android.hardware.camera2.CameraManager
@@ -404,6 +475,7 @@ class SmartIslandOverlayService : AccessibilityService() {
 
     private fun stopOverlaySession() {
         removeCollapsedWindow()
+        removePetWindow()
         stopForegroundSafely()
         if (::viewModel.isInitialized) {
             viewModel.collapse()
@@ -701,6 +773,97 @@ class SmartIslandOverlayService : AccessibilityService() {
         lastParams = params
         runCatchingLogged(TAG, "Failed to update view layout") { 
             windowManager.updateViewLayout(view, params) 
+        }
+    }
+
+    private fun ensurePetWindow(settings: SmartIslandSettings) {
+        if (destroyed || !::windowManager.isInitialized || petView != null) return
+        try {
+            val density = resources.displayMetrics.density
+            val owners = OverlayViewTreeOwners().also { it.resume() }
+            petOwners = owners
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+                x = (settings.petX * density).toInt()
+                y = (settings.petY * density).toInt()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
+            petParams = params
+
+            petView = ComposeView(this).apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                setViewTreeLifecycleOwner(owners)
+                setViewTreeViewModelStoreOwner(owners)
+                setViewTreeSavedStateRegistryOwner(owners)
+                setContent {
+                    PixiPetOverlay(
+                        petSize = settings.petSize.dp,
+                        sleepTimeoutSec = settings.petSleepTimeoutSec,
+                        events = petEvents,
+                        onDragOffset = { dx, dy ->
+                            petParams?.let { p ->
+                                p.x += dx
+                                p.y += dy
+                                petView?.let { v ->
+                                    if (v.isAttachedToWindow) {
+                                        runCatchingLogged(TAG, "pet updateViewLayout failed") {
+                                            windowManager.updateViewLayout(v, p)
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            petParams?.let { p ->
+                                val d = resources.displayMetrics.density
+                                serviceScope.launch {
+                                    repository.setPetPosition(p.x / d, p.y / d)
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+            runCatchingLogged(TAG, "pet windowManager.addView failed") {
+                windowManager.addView(petView, params)
+            } ?: run {
+                petView = null
+                petParams = null
+                petOwners?.destroy()
+                petOwners = null
+            }
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "ensurePetWindow fatal", e)
+            petView = null
+            petParams = null
+            petOwners?.destroy()
+            petOwners = null
+        }
+    }
+
+    private fun removePetWindow() {
+        val view = petView
+        petView = null
+        petParams = null
+        petOwners?.destroy()
+        petOwners = null
+        if (view == null || !::windowManager.isInitialized) return
+        runCatchingLogged(TAG, "Failed to remove pet view") {
+            if (view.isAttachedToWindow) {
+                windowManager.removeViewImmediate(view)
+            }
         }
     }
 

@@ -104,6 +104,11 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val PillSwipeLeftAction = stringPreferencesKey("pill_swipe_left_action")
         val PillSwipeRightAction = stringPreferencesKey("pill_swipe_right_action")
         val CirclePosition = stringPreferencesKey("circle_position")
+        val EnableVirtualPet = booleanPreferencesKey("enable_virtual_pet")
+        val PetSize = floatPreferencesKey("pet_size")
+        val PetX = floatPreferencesKey("pet_x")
+        val PetY = floatPreferencesKey("pet_y")
+        val PetSleepTimeoutSec = intPreferencesKey("pet_sleep_timeout_sec")
     }
 
     val settings: Flow<SmartIslandSettings> = context.smartIslandDataStore.data
@@ -244,7 +249,12 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 pillSwipeDownAction = prefs[Keys.PillSwipeDownAction] ?: defaults.pillSwipeDownAction,
                 pillSwipeLeftAction = prefs[Keys.PillSwipeLeftAction] ?: defaults.pillSwipeLeftAction,
                 pillSwipeRightAction = prefs[Keys.PillSwipeRightAction] ?: defaults.pillSwipeRightAction,
-                circlePosition = prefs[Keys.CirclePosition]?.takeIf { it in VALID_CIRCLE_POSITIONS } ?: defaults.circlePosition
+                circlePosition = prefs[Keys.CirclePosition]?.takeIf { it in VALID_CIRCLE_POSITIONS } ?: defaults.circlePosition,
+                enableVirtualPet = prefs[Keys.EnableVirtualPet] ?: defaults.enableVirtualPet,
+                petSize = validDimension(prefs[Keys.PetSize], defaults.petSize, SmartIslandSettings.MIN_PET_SIZE, SmartIslandSettings.MAX_PET_SIZE),
+                petX = validDimension(prefs[Keys.PetX], defaults.petX, SmartIslandSettings.MIN_PET_X, SmartIslandSettings.MAX_PET_X),
+                petY = validDimension(prefs[Keys.PetY], defaults.petY, SmartIslandSettings.MIN_PET_Y, SmartIslandSettings.MAX_PET_Y),
+                petSleepTimeoutSec = prefs[Keys.PetSleepTimeoutSec] ?: defaults.petSleepTimeoutSec
             )
         }
 
@@ -513,6 +523,15 @@ class SmartIslandSettingsRepository(private val context: Context) {
     suspend fun setCirclePosition(value: String) = editSafely {
         it[Keys.CirclePosition] = if (value in VALID_CIRCLE_POSITIONS) value else SmartIslandSettings.CIRCLE_POSITION_RIGHT
     }
+    suspend fun setEnableVirtualPet(value: Boolean) = editSafely { it[Keys.EnableVirtualPet] = value }
+    suspend fun setPetSize(value: Float) = editSafely {
+        it[Keys.PetSize] = validDimension(value, SmartIslandSettings.Default.petSize, SmartIslandSettings.MIN_PET_SIZE, SmartIslandSettings.MAX_PET_SIZE)
+    }
+    suspend fun setPetPosition(x: Float, y: Float) = editSafely {
+        it[Keys.PetX] = validDimension(x, SmartIslandSettings.Default.petX, SmartIslandSettings.MIN_PET_X, SmartIslandSettings.MAX_PET_X)
+        it[Keys.PetY] = validDimension(y, SmartIslandSettings.Default.petY, SmartIslandSettings.MIN_PET_Y, SmartIslandSettings.MAX_PET_Y)
+    }
+    suspend fun setPetSleepTimeoutSec(value: Int) = editSafely { it[Keys.PetSleepTimeoutSec] = value.coerceIn(5, 600) }
     suspend fun toggleNotificationCooldownExcludedPackage(packageName: String) = editSafely { prefs ->
         val current = prefs[Keys.NotificationCooldownExcludedPackages] ?: emptySet()
         prefs[Keys.NotificationCooldownExcludedPackages] = if (packageName in current) {
@@ -651,6 +670,11 @@ class SmartIslandSettingsRepository(private val context: Context) {
         } else {
             SmartIslandSettings.CIRCLE_POSITION_RIGHT
         }
+        prefs[Keys.EnableVirtualPet] = settings.enableVirtualPet
+        prefs[Keys.PetSize] = validDimension(settings.petSize, SmartIslandSettings.Default.petSize, SmartIslandSettings.MIN_PET_SIZE, SmartIslandSettings.MAX_PET_SIZE)
+        prefs[Keys.PetX] = validDimension(settings.petX, SmartIslandSettings.Default.petX, SmartIslandSettings.MIN_PET_X, SmartIslandSettings.MAX_PET_X)
+        prefs[Keys.PetY] = validDimension(settings.petY, SmartIslandSettings.Default.petY, SmartIslandSettings.MIN_PET_Y, SmartIslandSettings.MAX_PET_Y)
+        prefs[Keys.PetSleepTimeoutSec] = settings.petSleepTimeoutSec
     }
 
     suspend fun resetAllSettings() = restoreSettings(SmartIslandSettings.Default.copy(welcomeDialogShown = true))

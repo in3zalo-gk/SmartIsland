@@ -71,6 +71,7 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Pets
 import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
@@ -143,6 +144,7 @@ import com.agupta07505.smartisland.ui.sections.PermissionsSection
 import com.agupta07505.smartisland.ui.sections.UpdatesAndDownloadsSection
 import com.agupta07505.smartisland.ui.sections.PositionsSection
 import com.agupta07505.smartisland.ui.sections.SupportSection
+import com.agupta07505.smartisland.ui.sections.VirtualPetSection
 import com.agupta07505.smartisland.util.SystemServiceRecovery
 import com.agupta07505.smartisland.util.runCatchingLogged
 import kotlinx.coroutines.launch
@@ -164,7 +166,8 @@ private enum class FeatureDetailSection {
     UpdatesAndDownloads,
     AboutApp,
     SupportCommunity,
-    DeveloperOptions
+    DeveloperOptions,
+    VirtualPet
 }
 
 @SuppressLint("BatteryLife")
@@ -818,6 +821,14 @@ private fun SettingsOverviewSection(
                 icon = Icons.Rounded.Gesture,
                 onClick = { onNavigateTo(FeatureDetailSection.GesturesGuide) }
             )
+
+            FeatureStudioNavigationCard(
+                title = "Virtual Pet",
+                icon = Icons.Rounded.Pets,
+                statusText = if (settings.enableVirtualPet) "Active" else null,
+                statusColor = if (settings.enableVirtualPet) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = { onNavigateTo(FeatureDetailSection.VirtualPet) }
+            )
         }
 
         // Section 3: System
@@ -1067,6 +1078,7 @@ private fun DetailScreenHost(
                 FeatureDetailSection.AboutApp -> stringResource(R.string.detail_title_about_app)
                 FeatureDetailSection.SupportCommunity -> stringResource(R.string.detail_title_support_community)
                 FeatureDetailSection.DeveloperOptions -> stringResource(R.string.detail_title_developer_options)
+                FeatureDetailSection.VirtualPet -> "Virtual Pet"
             }
             Text(
                 text = title,
@@ -1148,6 +1160,9 @@ private fun DetailScreenHost(
             }
             FeatureDetailSection.DeveloperOptions -> {
                 DeveloperOptionsSection(settings = settings, repository = repository)
+            }
+            FeatureDetailSection.VirtualPet -> {
+                VirtualPetSection(settings = settings, repository = repository)
             }
         }
     }

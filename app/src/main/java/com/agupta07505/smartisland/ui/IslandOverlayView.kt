@@ -468,7 +468,7 @@ fun IslandOverlayView(
                         Modifier.shadow(
                             elevation = activeMainShadow,
                             shape = mainShape,
-                            clip = false,
+                            clip = true,
                             ambientColor = Color.Black,
                             spotColor = Color.Black
                         )
@@ -868,7 +868,7 @@ fun IslandOverlayView(
                             Modifier.shadow(
                                 elevation = (settings.shadowElevation * 0.85f).dp,
                                 shape = RoundedCornerShape(secondaryBubbleCorner),
-                                clip = false,
+                                clip = true,
                                 ambientColor = Color.Black,
                                 spotColor = Color.Black
                             )
@@ -938,7 +938,7 @@ fun IslandOverlayView(
                             Modifier.shadow(
                                 elevation = (settings.shadowElevation * 0.85f).dp,
                                 shape = RoundedCornerShape(settings.cornerRadius.dp),
-                                clip = false,
+                                clip = true,
                                 ambientColor = Color.Black,
                                 spotColor = Color.Black
                             )

@@ -77,7 +77,12 @@ data class SmartIslandSettings(
     val pillSwipeDownAction: String = "Expand",
     val pillSwipeLeftAction: String = "PreviousNotification",
     val pillSwipeRightAction: String = "NextNotification",
-    val circlePosition: String = CIRCLE_POSITION_RIGHT
+    val circlePosition: String = CIRCLE_POSITION_RIGHT,
+    val enableVirtualPet: Boolean = false,
+    val petSize: Float = 64f,
+    val petX: Float = 24f,
+    val petY: Float = 80f,
+    val petSleepTimeoutSec: Int = 45
 ) {
     fun toJson(appVersion: String = ""): String {
         val root = JSONObject()
@@ -171,6 +176,11 @@ data class SmartIslandSettings(
         settingsObj.put("pillSwipeLeftAction", pillSwipeLeftAction)
         settingsObj.put("pillSwipeRightAction", pillSwipeRightAction)
         settingsObj.put("circlePosition", circlePosition)
+        settingsObj.put("enableVirtualPet", enableVirtualPet)
+        settingsObj.put("petSize", petSize.toDouble())
+        settingsObj.put("petX", petX.toDouble())
+        settingsObj.put("petY", petY.toDouble())
+        settingsObj.put("petSleepTimeoutSec", petSleepTimeoutSec)
 
         root.put("settings", settingsObj)
         return root.toString(2)
@@ -205,6 +215,12 @@ data class SmartIslandSettings(
         const val MAX_OPACITY = 1f
         const val MIN_SHADOW_ELEVATION = 0f
         const val MAX_SHADOW_ELEVATION = 32f
+        const val MIN_PET_SIZE = 32f
+        const val MAX_PET_SIZE = 128f
+        const val MIN_PET_X = 0f
+        const val MAX_PET_X = 2000f
+        const val MIN_PET_Y = 0f
+        const val MAX_PET_Y = 4000f
 
         fun parseBackupMetadata(jsonString: String): BackupMetadata? {
             return runCatching {
@@ -323,7 +339,12 @@ data class SmartIslandSettings(
                 pillSwipeRightAction = obj.optString("pillSwipeRightAction", defaults.pillSwipeRightAction),
                 circlePosition = obj.optString("circlePosition", defaults.circlePosition).let {
                     if (it == CIRCLE_POSITION_LEFT || it == CIRCLE_POSITION_RIGHT) it else defaults.circlePosition
-                }
+                },
+                enableVirtualPet = obj.optBoolean("enableVirtualPet", defaults.enableVirtualPet),
+                petSize = safeFloat("petSize", defaults.petSize, MIN_PET_SIZE, MAX_PET_SIZE),
+                petX = safeFloat("petX", defaults.petX, MIN_PET_X, MAX_PET_X),
+                petY = safeFloat("petY", defaults.petY, MIN_PET_Y, MAX_PET_Y),
+                petSleepTimeoutSec = obj.optInt("petSleepTimeoutSec", defaults.petSleepTimeoutSec).coerceIn(5, 600)
             )
         }
     }
