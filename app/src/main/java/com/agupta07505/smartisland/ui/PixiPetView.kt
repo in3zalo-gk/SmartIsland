@@ -7,59 +7,108 @@
 
 package com.agupta07505.smartisland.ui
 
+import android.graphics.Bitmap
 import android.graphics.Paint
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.min
-import kotlin.math.sin
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import java.util.Calendar
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.AvTimer
+import androidx.compose.material.icons.rounded.BatteryAlert
+import androidx.compose.material.icons.rounded.BluetoothConnected
+import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.FlashlightOn
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Navigation
+import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.WifiTethering
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.agupta07505.smartisland.model.IslandMode
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import java.util.Calendar
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.exp
+import kotlin.math.min
+import kotlin.math.sin
 
 enum class PixiPetMood {
-    IDLE, ALERT, HAPPY, ANNOYED, DIZZY, DRAG, DOWNLOAD, SLEEP, CHARGE
+    IDLE, ALERT, HAPPY, ANNOYED, DIZZY, DRAG, DOWNLOAD, SLEEP, CHARGE, BATTERY_LOW
 }
 
 sealed interface PixiPetEvent {
-    data object Notification : PixiPetEvent
+    data class Notification(
+        val appName: String,
+        val icon: Bitmap?,
+        val mode: IslandMode,
+        val eventId: Long
+    ) : PixiPetEvent
     data class Download(val progress: Int) : PixiPetEvent
     data object Charge : PixiPetEvent
     data object BatteryLow : PixiPetEvent
     data object Idle : PixiPetEvent
 }
 
+private sealed interface PixiPetBadge {
+    data class App(val appName: String, val icon: Bitmap?, val mode: IslandMode) : PixiPetBadge
+    data class Download(val progress: Int) : PixiPetBadge
+    data object Charging : PixiPetBadge
+    data object BatteryLow : PixiPetBadge
+}
+
 private val ONE_SHOT_MOODS = setOf(
-    PixiPetMood.HAPPY, PixiPetMood.ANNOYED, PixiPetMood.DIZZY
+    PixiPetMood.ALERT, PixiPetMood.HAPPY, PixiPetMood.ANNOYED, PixiPetMood.DIZZY
 )
 
-private const val ONE_SHOT_DURATION_MS = 1500L
+private const val ONE_SHOT_DURATION_MS = 1150L
 private const val TAP_WINDOW_MS = 400L
 
 /**
@@ -79,11 +128,18 @@ fun PixiPetOverlay(
     nightModeEndHour: Int = 7,
     modifier: Modifier = Modifier
 ) {
+    var baseMood by remember { mutableStateOf(PixiPetMood.IDLE) }
+    var baseBadge by remember { mutableStateOf<PixiPetBadge?>(null) }
     var mood by remember { mutableStateOf(PixiPetMood.IDLE) }
+    var eventBadge by remember { mutableStateOf<PixiPetBadge?>(null) }
     var moodStartNanos by remember { mutableStateOf(System.nanoTime()) }
     var downloadProgress by remember { mutableStateOf(-1) }
+    var oneShotToken by remember { mutableStateOf(0L) }
     var lastInteractTime by remember { mutableStateOf(System.currentTimeMillis()) }
     val clicks = remember { ArrayDeque<Long>() }
+    val latestBaseMood = rememberUpdatedState(baseMood)
+    val latestBaseBadge = rememberUpdatedState(baseBadge)
+    val latestMood = rememberUpdatedState(mood)
 
     // Periodically re-evaluate whether it's currently nighttime
     var isNight by remember { mutableStateOf(false) }
@@ -103,31 +159,59 @@ fun PixiPetOverlay(
         }
     }
 
-    fun setMood(m: PixiPetMood) {
-        if (mood != m) {
-            mood = m
-            moodStartNanos = System.nanoTime()
-        }
+    fun setMood(m: PixiPetMood, badge: PixiPetBadge? = eventBadge) {
+        mood = m
+        eventBadge = badge
+        moodStartNanos = System.nanoTime()
+        if (m in ONE_SHOT_MOODS) oneShotToken += 1L
     }
 
-    // Continuous animation clock — drives Canvas redraw every frame
-    var frameNanos by remember { mutableStateOf(0L) }
-    LaunchedEffect(Unit) {
-        while (true) withFrameNanos { frameNanos = it }
+    fun setBaseMood(m: PixiPetMood, badge: PixiPetBadge?) {
+        baseMood = m
+        baseBadge = badge
+        if (mood !in ONE_SHOT_MOODS) setMood(m, badge)
     }
 
-    // React to system events (notifications, charging, downloads, etc.)
+    fun restoreBaseMood() {
+        mood = latestBaseMood.value
+        eventBadge = latestBaseBadge.value
+        moodStartNanos = System.nanoTime()
+    }
+
+    // Keep frame time as draw state so animation frames invalidate Canvas, not
+    // the whole overlay composition. This avoids a full recomposition at 60 fps.
+    val frameNanos = remember { mutableStateOf(0L) }
     LaunchedEffect(Unit) {
+        while (true) withFrameNanos { frameNanos.value = it }
+    }
+
+    // React to system events. Notifications are one-shot; charge/download/low
+    // battery are base states, so a new alert returns to the correct behavior.
+    LaunchedEffect(events) {
         events.collect { event ->
             when (event) {
-                is PixiPetEvent.Notification -> setMood(PixiPetMood.ALERT)
-                is PixiPetEvent.Download -> {
-                    downloadProgress = event.progress
-                    setMood(PixiPetMood.DOWNLOAD)
+                is PixiPetEvent.Notification -> {
+                    setMood(
+                        PixiPetMood.ALERT,
+                        PixiPetBadge.App(event.appName, event.icon, event.mode)
+                    )
                 }
-                is PixiPetEvent.Charge -> setMood(PixiPetMood.CHARGE)
-                is PixiPetEvent.BatteryLow -> setMood(PixiPetMood.ALERT)
-                is PixiPetEvent.Idle -> setMood(PixiPetMood.IDLE)
+                is PixiPetEvent.Download -> {
+                    downloadProgress = event.progress.coerceIn(-1, 100)
+                    setBaseMood(PixiPetMood.DOWNLOAD, PixiPetBadge.Download(downloadProgress))
+                }
+                is PixiPetEvent.Charge -> {
+                    downloadProgress = -1
+                    setBaseMood(PixiPetMood.CHARGE, PixiPetBadge.Charging)
+                }
+                is PixiPetEvent.BatteryLow -> {
+                    downloadProgress = -1
+                    setBaseMood(PixiPetMood.BATTERY_LOW, PixiPetBadge.BatteryLow)
+                }
+                is PixiPetEvent.Idle -> {
+                    downloadProgress = -1
+                    setBaseMood(PixiPetMood.IDLE, null)
+                }
             }
             lastInteractTime = System.currentTimeMillis()
         }
@@ -141,11 +225,13 @@ fun PixiPetOverlay(
         }
     }
 
-    // One-shot moods auto-return to IDLE
-    LaunchedEffect(mood) {
+    // Every alert/tap gets its own token. Repeated notifications can therefore
+    // restart the animation even when the pet is already in ALERT.
+    LaunchedEffect(oneShotToken) {
         if (mood in ONE_SHOT_MOODS) {
+            val token = oneShotToken
             delay(ONE_SHOT_DURATION_MS)
-            if (mood in ONE_SHOT_MOODS) setMood(PixiPetMood.IDLE)
+            if (token == oneShotToken && latestMood.value in ONE_SHOT_MOODS) restoreBaseMood()
         }
     }
 
@@ -181,7 +267,7 @@ fun PixiPetOverlay(
                                 }
                             } else {
                                 onDragEnd()
-                                setMood(PixiPetMood.IDLE)
+                                restoreBaseMood()
                             }
                             break
                         } else {
@@ -209,6 +295,7 @@ fun PixiPetOverlay(
             nightMode = isNight,
             modifier = Modifier.fillMaxSize()
         )
+        PixiPetEventBadge(eventBadge, isNight)
     }
 }
 
@@ -219,15 +306,12 @@ fun PixiPetOverlay(
 @Composable
 private fun PixiPetCanvas(
     mood: PixiPetMood,
-    frameNanos: Long,
+    frameNanos: State<Long>,
     moodStartNanos: Long,
     downloadProgress: Int,
     nightMode: Boolean,
     modifier: Modifier
 ) {
-    val t = frameNanos / 1_000_000_000f
-    val dt = (frameNanos - moodStartNanos) / 1_000_000_000f
-
     val textPaint = remember(nightMode) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textAlign = Paint.Align.CENTER
@@ -239,6 +323,9 @@ private fun PixiPetCanvas(
         val w = size.width
         val h = size.height
         if (w <= 0f || h <= 0f) return@Canvas
+        val frameTime = frameNanos.value
+        val t = frameTime / 1_000_000_000f
+        val dt = (frameTime - moodStartNanos).coerceAtLeast(0L) / 1_000_000_000f
 
         // --- Animation offsets per mood ---
         var dx = 0f
@@ -246,8 +333,9 @@ private fun PixiPetCanvas(
         var sy = 1f
         when (mood) {
             PixiPetMood.ALERT -> {
-                dx = sin(t * 18f) * w * 0.06f
-                dy = abs(sin(t * 12f)) * h * 0.03f
+                val damping = exp(-dt * 3.2f)
+                dx = sin(dt * 26f) * w * 0.055f * damping
+                dy = abs(sin(dt * 18f)) * h * 0.025f * damping
             }
             PixiPetMood.HAPPY -> {
                 dy = -abs(sin(min(dt * 6f, 3.14f))) * h * 0.22f
@@ -255,8 +343,9 @@ private fun PixiPetCanvas(
             }
             PixiPetMood.DRAG -> sy = 0.88f
             PixiPetMood.DIZZY -> {
-                dx = sin(t * 10f) * w * 0.08f
-                dy = cos(t * 8f) * h * 0.04f
+                val damping = exp(-dt * 1.8f)
+                dx = sin(dt * 12f) * w * 0.065f * damping
+                dy = cos(dt * 10f) * h * 0.035f * damping
             }
             PixiPetMood.SLEEP -> dy = 2f + abs(sin(t * 1.2f)) * 2f
             PixiPetMood.CHARGE -> {
@@ -278,6 +367,7 @@ private fun PixiPetCanvas(
                 PixiPetMood.ANNOYED -> Color(110, 80, 100)
                 PixiPetMood.DIZZY -> Color(80, 110, 90)
                 PixiPetMood.CHARGE -> Color(130, 110, 60)
+                PixiPetMood.BATTERY_LOW -> Color(115, 55, 58)
                 PixiPetMood.SLEEP -> Color(50, 65, 100)
                 PixiPetMood.HAPPY -> Color(70, 110, 100)
                 else -> Color(60, 80, 120)
@@ -288,6 +378,7 @@ private fun PixiPetCanvas(
                 PixiPetMood.ANNOYED -> Color(220, 150, 190)
                 PixiPetMood.DIZZY -> Color(160, 230, 160)
                 PixiPetMood.CHARGE -> Color(255, 220, 100)
+                PixiPetMood.BATTERY_LOW -> Color(255, 105, 105)
                 PixiPetMood.SLEEP -> Color(100, 140, 200)
                 PixiPetMood.HAPPY -> Color(140, 220, 180)
                 else -> Color(120, 180, 255)
@@ -338,7 +429,7 @@ private fun PixiPetCanvas(
         }
 
         // --- Eyes ---
-        val blink = (frameNanos / 1_000_000L % 4200) < 140
+        val blink = (frameTime / 1_000_000L % 4200) < 140
         val er = bw * if (mood == PixiPetMood.ALERT || mood == PixiPetMood.DRAG) 0.15f else 0.11f
         val ey = bodyTop + bh * 0.40f
 
@@ -424,14 +515,6 @@ private fun PixiPetCanvas(
             drawIntoCanvas { it.nativeCanvas.drawText("z", zx + w * 0.08f, zy - h * 0.08f, textPaint) }
         }
 
-        // Charge: ⚡ symbol
-        if (mood == PixiPetMood.CHARGE) {
-            textPaint.textSize = h * 0.22f
-            drawIntoCanvas {
-                it.nativeCanvas.drawText("⚡", cx + w * 0.28f, bodyTop + h * 0.14f, textPaint)
-            }
-        }
-
         // Download: progress bar at bottom
         if (mood == PixiPetMood.DOWNLOAD) {
             val bl = w * 0.12f
@@ -467,4 +550,131 @@ private fun PixiPetCanvas(
             }
         }
     }
+}
+
+
+@Composable
+private fun BoxScope.PixiPetEventBadge(badge: PixiPetBadge?, nightMode: Boolean) {
+    if (badge == null) return
+
+    val pulseTransition = rememberInfiniteTransition(label = "petChargingBadge")
+    val chargingPulse by pulseTransition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "chargingBadgePulse"
+    )
+    val accent = when (badge) {
+        PixiPetBadge.Charging -> Color(0xFFFFC857)
+        PixiPetBadge.BatteryLow -> Color(0xFFFF6666)
+        is PixiPetBadge.Download -> Color(0xFF69B7FF)
+        is PixiPetBadge.App -> Color(0xFFB7C9FF)
+    }
+    val background = if (nightMode) Color(0xFF242833) else Color(0xFF17202A)
+
+    Box(
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .offset(x = 2.dp, y = 2.dp)
+            .size(28.dp)
+            .then(
+                if (badge == PixiPetBadge.Charging) {
+                    Modifier.graphicsLayer {
+                        scaleX = chargingPulse
+                        scaleY = chargingPulse
+                    }
+                } else Modifier
+            )
+            .clip(CircleShape)
+            .background(background)
+            .border(1.5.dp, accent, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        when (badge) {
+            is PixiPetBadge.App -> {
+                val image = badge.icon?.asImageBitmap()
+                if (badge.mode == IslandMode.Notification && image != null) {
+                    Image(
+                        bitmap = image,
+                        contentDescription = "${badge.appName} notification",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(2.dp)
+                            .clip(CircleShape)
+                    )
+                } else {
+                    val glyph = badge.mode.petGlyph()
+                    if (glyph != null) {
+                        Icon(
+                            imageVector = glyph,
+                            contentDescription = "${badge.appName} activity",
+                            tint = accent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    } else if (image != null) {
+                        Image(
+                            bitmap = image,
+                            contentDescription = "${badge.appName} notification",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(2.dp)
+                                .clip(CircleShape)
+                        )
+                    } else {
+                        Text(
+                            text = badge.appName.firstOrNull()?.uppercase() ?: "S",
+                            color = accent,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+            is PixiPetBadge.Download -> {
+                Canvas(Modifier.fillMaxSize().padding(1.dp)) {
+                    drawArc(
+                        color = accent,
+                        startAngle = -90f,
+                        sweepAngle = 360f * (badge.progress.coerceIn(0, 100) / 100f),
+                        useCenter = false,
+                        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Rounded.ArrowDownward,
+                    contentDescription = "Download ${badge.progress}%",
+                    tint = accent,
+                    modifier = Modifier.size(15.dp)
+                )
+            }
+            PixiPetBadge.Charging -> Icon(
+                imageVector = Icons.Rounded.Bolt,
+                contentDescription = "Charging",
+                tint = accent,
+                modifier = Modifier.size(17.dp)
+            )
+            PixiPetBadge.BatteryLow -> Icon(
+                imageVector = Icons.Rounded.BatteryAlert,
+                contentDescription = "Low battery",
+                tint = accent,
+                modifier = Modifier.size(17.dp)
+            )
+        }
+    }
+}
+
+private fun IslandMode.petGlyph(): ImageVector? = when (this) {
+    IslandMode.IncomingCall -> Icons.Rounded.Call
+    IslandMode.Music -> Icons.Rounded.MusicNote
+    IslandMode.Battery -> Icons.Rounded.Bolt
+    IslandMode.DownloadUpload -> Icons.Rounded.ArrowDownward
+    IslandMode.Navigation -> Icons.Rounded.Navigation
+    IslandMode.Hotspot -> Icons.Rounded.WifiTethering
+    IslandMode.Bluetooth -> Icons.Rounded.BluetoothConnected
+    IslandMode.Flashlight -> Icons.Rounded.FlashlightOn
+    IslandMode.Timer -> Icons.Rounded.Timer
+    IslandMode.Stopwatch -> Icons.Rounded.AvTimer
+    else -> null
 }
