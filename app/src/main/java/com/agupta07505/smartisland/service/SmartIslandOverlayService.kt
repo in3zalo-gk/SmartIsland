@@ -21,6 +21,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.BatteryManager
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
@@ -40,6 +41,7 @@ import com.agupta07505.smartisland.data.INotificationRepository
 import com.agupta07505.smartisland.data.SmartIslandCommand
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.data.SmartIslandSettingsRepository
+import com.agupta07505.smartisland.model.IslandMode
 import com.agupta07505.smartisland.model.IslandNotification
 import com.agupta07505.smartisland.ui.IslandViewModel
 import com.agupta07505.smartisland.ui.OverlayIsland
@@ -70,6 +72,10 @@ class SmartIslandOverlayService : AccessibilityService() {
     private var petView: ComposeView? = null
     private var petParams: WindowManager.LayoutParams? = null
     private val petEvents = MutableStateFlow<PixiPetEvent>(PixiPetEvent.Idle)
+    private var petIsCharging = false
+    private var petBatteryIsLow = false
+    private var lastPetNotificationFingerprint: String? = null
+    private var petNotificationSequence = 0L
     private var petOwners: OverlayViewTreeOwners? = null
     private var petPowerReceiverRegistered = false
     private val overlayOwners = OverlayViewTreeOwners()
@@ -119,13 +125,33 @@ class SmartIslandOverlayService : AccessibilityService() {
             }
     )
 
+    private fun restingPetEvent(): PixiPetEvent = when {
+        petIsCharging -> PixiPetEvent.Charge
+        petBatteryIsLow -> PixiPetEvent.BatteryLow
+        else -> PixiPetEvent.Idle
+    }
+
     private val petPowerReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (destroyed) return
             when (intent.action) {
-                Intent.ACTION_POWER_CONNECTED -> petEvents.value = PixiPetEvent.Charge
-                Intent.ACTION_BATTERY_LOW -> petEvents.value = PixiPetEvent.BatteryLow
-                Intent.ACTION_BATTERY_OKAY -> petEvents.value = PixiPetEvent.Idle
+                Intent.ACTION_POWER_CONNECTED -> {
+                    petIsCharging = true
+                    petBatteryIsLow = false
+                    petEvents.value = PixiPetEvent.Charge
+                }
+                Intent.ACTION_POWER_DISCONNECTED -> {
+                    petIsCharging = false
+                    petEvents.value = restingPetEvent()
+                }
+                Intent.ACTION_BATTERY_LOW -> {
+                    petBatteryIsLow = true
+                    petEvents.value = PixiPetEvent.BatteryLow
+                }
+                Intent.ACTION_BATTERY_OKAY -> {
+                    petBatteryIsLow = false
+                    petEvents.value = restingPetEvent()
+                }
             }
         }
     }
@@ -350,23 +376,39 @@ class SmartIslandOverlayService : AccessibilityService() {
             }
         }
 
-        // Pet: react to notifications and downloads
+        // Pet: use Smart Island's notification icon/mode glyph, with a unique
+        // event id so repeated notifications retrigger the short alert animation.
         serviceScope.launch {
             runSuspendCatchingLogged(TAG, "Pet notification collector failed") {
                 notificationRepository.notifications.collect { list ->
                     if (destroyed) return@collect
-                    if (list.isEmpty()) {
-                        petEvents.value = PixiPetEvent.Idle
+                    val download = list.firstOrNull {
+                        it.mode == IslandMode.DownloadUpload && it.progressMax > 0
+                    }
+                    if (download != null) {
+                        lastPetNotificationFingerprint = null
+                        val progress = (download.progress * 100 / download.progressMax).coerceIn(0, 100)
+                        petEvents.value = PixiPetEvent.Download(progress)
+                        return@collect
+                    }
+
+                    if (petEvents.value is PixiPetEvent.Download) {
+                        petEvents.value = restingPetEvent()
+                    }
+                    val newest = list.maxByOrNull { it.timeMillis }
+                    if (newest == null) {
+                        lastPetNotificationFingerprint = null
+                        petEvents.value = restingPetEvent()
                     } else {
-                        val download = list.firstOrNull {
-                            it.mode == com.agupta07505.smartisland.model.IslandMode.DownloadUpload
-                        }
-                        if (download != null && download.progressMax > 0) {
-                            petEvents.value = PixiPetEvent.Download(
-                                download.progress * 100 / download.progressMax
+                        val fingerprint = "${newest.key}:${newest.timeMillis}"
+                        if (fingerprint != lastPetNotificationFingerprint) {
+                            lastPetNotificationFingerprint = fingerprint
+                            petEvents.value = PixiPetEvent.Notification(
+                                appName = newest.appName,
+                                icon = newest.largeIcon ?: newest.icon,
+                                mode = newest.mode,
+                                eventId = ++petNotificationSequence
                             )
-                        } else {
-                            petEvents.value = PixiPetEvent.Notification
                         }
                     }
                 }
@@ -375,8 +417,18 @@ class SmartIslandOverlayService : AccessibilityService() {
 
         // Pet: react to charging / battery events
         runCatchingLogged(TAG, "registerPetPowerReceiver failed") {
+            val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val batteryStatus = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+            petIsCharging = batteryStatus == BatteryManager.BATTERY_STATUS_CHARGING ||
+                batteryStatus == BatteryManager.BATTERY_STATUS_FULL
+            petBatteryIsLow = !petIsCharging && level >= 0 && scale > 0 && level * 100 / scale <= 15
+            petEvents.value = restingPetEvent()
+
             val petFilter = IntentFilter().apply {
                 addAction(Intent.ACTION_POWER_CONNECTED)
+                addAction(Intent.ACTION_POWER_DISCONNECTED)
                 addAction(Intent.ACTION_BATTERY_LOW)
                 addAction(Intent.ACTION_BATTERY_OKAY)
             }
