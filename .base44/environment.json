@@ -1,0 +1,1 @@
+{"previewPort": null, "healthPath": null, "startCommand": "docker compose -f docker-compose.base44.yml run --rm builder ./gradlew assembleDebug --no-daemon", "secrets": []}

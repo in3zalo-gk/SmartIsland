@@ -109,6 +109,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val PetX = floatPreferencesKey("pet_x")
         val PetY = floatPreferencesKey("pet_y")
         val PetSleepTimeoutSec = intPreferencesKey("pet_sleep_timeout_sec")
+        val PetNightModeEnabled = booleanPreferencesKey("pet_night_mode_enabled")
+        val PetNightModeStartHour = intPreferencesKey("pet_night_mode_start_hour")
+        val PetNightModeEndHour = intPreferencesKey("pet_night_mode_end_hour")
     }
 
     val settings: Flow<SmartIslandSettings> = context.smartIslandDataStore.data
@@ -254,7 +257,10 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 petSize = validDimension(prefs[Keys.PetSize], defaults.petSize, SmartIslandSettings.MIN_PET_SIZE, SmartIslandSettings.MAX_PET_SIZE),
                 petX = validDimension(prefs[Keys.PetX], defaults.petX, SmartIslandSettings.MIN_PET_X, SmartIslandSettings.MAX_PET_X),
                 petY = validDimension(prefs[Keys.PetY], defaults.petY, SmartIslandSettings.MIN_PET_Y, SmartIslandSettings.MAX_PET_Y),
-                petSleepTimeoutSec = prefs[Keys.PetSleepTimeoutSec] ?: defaults.petSleepTimeoutSec
+                petSleepTimeoutSec = prefs[Keys.PetSleepTimeoutSec] ?: defaults.petSleepTimeoutSec,
+                petNightModeEnabled = prefs[Keys.PetNightModeEnabled] ?: defaults.petNightModeEnabled,
+                petNightModeStartHour = prefs[Keys.PetNightModeStartHour] ?: defaults.petNightModeStartHour,
+                petNightModeEndHour = prefs[Keys.PetNightModeEndHour] ?: defaults.petNightModeEndHour
             )
         }
 
@@ -532,6 +538,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
         it[Keys.PetY] = validDimension(y, SmartIslandSettings.Default.petY, SmartIslandSettings.MIN_PET_Y, SmartIslandSettings.MAX_PET_Y)
     }
     suspend fun setPetSleepTimeoutSec(value: Int) = editSafely { it[Keys.PetSleepTimeoutSec] = value.coerceIn(5, 600) }
+    suspend fun setPetNightModeEnabled(value: Boolean) = editSafely { it[Keys.PetNightModeEnabled] = value }
+    suspend fun setPetNightModeStartHour(value: Int) = editSafely { it[Keys.PetNightModeStartHour] = value.coerceIn(0, 23) }
+    suspend fun setPetNightModeEndHour(value: Int) = editSafely { it[Keys.PetNightModeEndHour] = value.coerceIn(0, 23) }
     suspend fun toggleNotificationCooldownExcludedPackage(packageName: String) = editSafely { prefs ->
         val current = prefs[Keys.NotificationCooldownExcludedPackages] ?: emptySet()
         prefs[Keys.NotificationCooldownExcludedPackages] = if (packageName in current) {
@@ -675,6 +684,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.PetX] = validDimension(settings.petX, SmartIslandSettings.Default.petX, SmartIslandSettings.MIN_PET_X, SmartIslandSettings.MAX_PET_X)
         prefs[Keys.PetY] = validDimension(settings.petY, SmartIslandSettings.Default.petY, SmartIslandSettings.MIN_PET_Y, SmartIslandSettings.MAX_PET_Y)
         prefs[Keys.PetSleepTimeoutSec] = settings.petSleepTimeoutSec
+        prefs[Keys.PetNightModeEnabled] = settings.petNightModeEnabled
+        prefs[Keys.PetNightModeStartHour] = settings.petNightModeStartHour.coerceIn(0, 23)
+        prefs[Keys.PetNightModeEndHour] = settings.petNightModeEndHour.coerceIn(0, 23)
     }
 
     suspend fun resetAllSettings() = restoreSettings(SmartIslandSettings.Default.copy(welcomeDialogShown = true))

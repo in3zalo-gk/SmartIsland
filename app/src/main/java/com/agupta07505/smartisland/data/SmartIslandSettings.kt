@@ -82,7 +82,10 @@ data class SmartIslandSettings(
     val petSize: Float = 64f,
     val petX: Float = 24f,
     val petY: Float = 80f,
-    val petSleepTimeoutSec: Int = 45
+    val petSleepTimeoutSec: Int = 45,
+    val petNightModeEnabled: Boolean = false,
+    val petNightModeStartHour: Int = 22,
+    val petNightModeEndHour: Int = 7
 ) {
     fun toJson(appVersion: String = ""): String {
         val root = JSONObject()
@@ -181,6 +184,9 @@ data class SmartIslandSettings(
         settingsObj.put("petX", petX.toDouble())
         settingsObj.put("petY", petY.toDouble())
         settingsObj.put("petSleepTimeoutSec", petSleepTimeoutSec)
+        settingsObj.put("petNightModeEnabled", petNightModeEnabled)
+        settingsObj.put("petNightModeStartHour", petNightModeStartHour)
+        settingsObj.put("petNightModeEndHour", petNightModeEndHour)
 
         root.put("settings", settingsObj)
         return root.toString(2)
@@ -221,6 +227,8 @@ data class SmartIslandSettings(
         const val MAX_PET_X = 2000f
         const val MIN_PET_Y = 0f
         const val MAX_PET_Y = 4000f
+        const val MIN_NIGHT_HOUR = 0
+        const val MAX_NIGHT_HOUR = 23
 
         fun parseBackupMetadata(jsonString: String): BackupMetadata? {
             return runCatching {
@@ -344,7 +352,10 @@ data class SmartIslandSettings(
                 petSize = safeFloat("petSize", defaults.petSize, MIN_PET_SIZE, MAX_PET_SIZE),
                 petX = safeFloat("petX", defaults.petX, MIN_PET_X, MAX_PET_X),
                 petY = safeFloat("petY", defaults.petY, MIN_PET_Y, MAX_PET_Y),
-                petSleepTimeoutSec = obj.optInt("petSleepTimeoutSec", defaults.petSleepTimeoutSec).coerceIn(5, 600)
+                petSleepTimeoutSec = obj.optInt("petSleepTimeoutSec", defaults.petSleepTimeoutSec).coerceIn(5, 600),
+                petNightModeEnabled = obj.optBoolean("petNightModeEnabled", defaults.petNightModeEnabled),
+                petNightModeStartHour = obj.optInt("petNightModeStartHour", defaults.petNightModeStartHour).coerceIn(0, 23),
+                petNightModeEndHour = obj.optInt("petNightModeEndHour", defaults.petNightModeEndHour).coerceIn(0, 23)
             )
         }
     }

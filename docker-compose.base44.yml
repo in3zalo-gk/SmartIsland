@@ -1,0 +1,14 @@
+services:
+  builder:
+    build:
+      context: .
+      dockerfile: Dockerfile.base44
+    working_dir: /app
+    volumes:
+      - .:/app
+      - gradle-cache:/home/gradle/.gradle
+    command: ["./gradlew", "assembleDebug", "--no-daemon"]
+    environment:
+      - GRADLE_OPTS=-Xmx2g -Dorg.gradle.daemon=false
+volumes:
+  gradle-cache:

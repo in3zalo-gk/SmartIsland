@@ -14,6 +14,7 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import java.util.Calendar
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -73,6 +74,9 @@ fun PixiPetOverlay(
     events: Flow<PixiPetEvent>,
     onDragOffset: (Int, Int) -> Unit,
     onDragEnd: () -> Unit,
+    nightModeEnabled: Boolean = false,
+    nightModeStartHour: Int = 22,
+    nightModeEndHour: Int = 7,
     modifier: Modifier = Modifier
 ) {
     var mood by remember { mutableStateOf(PixiPetMood.IDLE) }
@@ -80,6 +84,24 @@ fun PixiPetOverlay(
     var downloadProgress by remember { mutableStateOf(-1) }
     var lastInteractTime by remember { mutableStateOf(System.currentTimeMillis()) }
     val clicks = remember { ArrayDeque<Long>() }
+
+    // Periodically re-evaluate whether it's currently nighttime
+    var isNight by remember { mutableStateOf(false) }
+    LaunchedEffect(nightModeEnabled, nightModeStartHour, nightModeEndHour) {
+        if (!nightModeEnabled) {
+            isNight = false
+        } else {
+            while (true) {
+                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                isNight = if (nightModeStartHour <= nightModeEndHour) {
+                    hour in nightModeStartHour..nightModeEndHour
+                } else {
+                    hour >= nightModeStartHour || hour < nightModeEndHour
+                }
+                delay(60_000L) // re-check every minute
+            }
+        }
+    }
 
     fun setMood(m: PixiPetMood) {
         if (mood != m) {
@@ -184,6 +206,7 @@ fun PixiPetOverlay(
             frameNanos = frameNanos,
             moodStartNanos = moodStartNanos,
             downloadProgress = downloadProgress,
+            nightMode = isNight,
             modifier = Modifier.fillMaxSize()
         )
     }
@@ -199,15 +222,16 @@ private fun PixiPetCanvas(
     frameNanos: Long,
     moodStartNanos: Long,
     downloadProgress: Int,
+    nightMode: Boolean,
     modifier: Modifier
 ) {
     val t = frameNanos / 1_000_000_000f
     val dt = (frameNanos - moodStartNanos) / 1_000_000_000f
 
-    val textPaint = remember {
+    val textPaint = remember(nightMode) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textAlign = Paint.Align.CENTER
-            color = android.graphics.Color.rgb(70, 110, 220)
+            color = if (nightMode) android.graphics.Color.rgb(100, 115, 160) else android.graphics.Color.rgb(70, 110, 220)
         }
     }
 
@@ -247,15 +271,29 @@ private fun PixiPetCanvas(
         val bottom = h * 0.88f + dy
 
         // --- Body ---
-        val bodyColor = when (mood) {
-            PixiPetMood.ALERT -> Color(255, 170, 100)
-            PixiPetMood.ANNOYED -> Color(220, 150, 190)
-            PixiPetMood.DIZZY -> Color(160, 230, 160)
-            PixiPetMood.CHARGE -> Color(255, 220, 100)
-            PixiPetMood.SLEEP -> Color(100, 140, 200)
-            PixiPetMood.HAPPY -> Color(140, 220, 180)
-            else -> Color(120, 180, 255)
+        // Night mode uses muted, low-saturation colors that are easier on the eyes in the dark.
+        val bodyColor = if (nightMode) {
+            when (mood) {
+                PixiPetMood.ALERT -> Color(120, 90, 60)
+                PixiPetMood.ANNOYED -> Color(110, 80, 100)
+                PixiPetMood.DIZZY -> Color(80, 110, 90)
+                PixiPetMood.CHARGE -> Color(130, 110, 60)
+                PixiPetMood.SLEEP -> Color(50, 65, 100)
+                PixiPetMood.HAPPY -> Color(70, 110, 100)
+                else -> Color(60, 80, 120)
+            }
+        } else {
+            when (mood) {
+                PixiPetMood.ALERT -> Color(255, 170, 100)
+                PixiPetMood.ANNOYED -> Color(220, 150, 190)
+                PixiPetMood.DIZZY -> Color(160, 230, 160)
+                PixiPetMood.CHARGE -> Color(255, 220, 100)
+                PixiPetMood.SLEEP -> Color(100, 140, 200)
+                PixiPetMood.HAPPY -> Color(140, 220, 180)
+                else -> Color(120, 180, 255)
+            }
         }
+        val strokeColor = if (nightMode) Color(180, 190, 210, 200) else Color(40, 50, 70)
         val s = 1f + 0.03f * sin(t * 2f)
         val bw = w * 0.72f * s * (if (mood == PixiPetMood.DRAG) 1.12f else 1f)
         val bh = h * 0.58f * (2f - s) * sy * (if (mood == PixiPetMood.DRAG) 0.9f else 1f)
@@ -270,7 +308,7 @@ private fun PixiPetCanvas(
             cornerRadius = cr
         )
         drawRoundRect(
-            color = Color(40, 50, 70),
+            color = strokeColor,
             topLeft = Offset(bodyLeft, bodyTop),
             size = Size(bw, bh),
             cornerRadius = cr,
@@ -286,13 +324,14 @@ private fun PixiPetCanvas(
             )
         ) {
             val cheekR = bw * 0.12f
+            val cheekColor = if (nightMode) Color(180, 120, 130, 90) else Color(255, 160, 170, 160)
             drawCircle(
-                color = Color(255, 160, 170, 160),
+                color = cheekColor,
                 radius = cheekR,
                 center = Offset(cx - bw * 0.28f, bodyTop + bh * 0.62f)
             )
             drawCircle(
-                color = Color(255, 160, 170, 160),
+                color = cheekColor,
                 radius = cheekR,
                 center = Offset(cx + bw * 0.28f, bodyTop + bh * 0.62f)
             )
@@ -302,7 +341,6 @@ private fun PixiPetCanvas(
         val blink = (frameNanos / 1_000_000L % 4200) < 140
         val er = bw * if (mood == PixiPetMood.ALERT || mood == PixiPetMood.DRAG) 0.15f else 0.11f
         val ey = bodyTop + bh * 0.40f
-        val strokeColor = Color(40, 50, 70)
 
         for (sign in intArrayOf(-1, 1)) {
             val ex = cx + sign * bw * 0.22f
@@ -358,13 +396,15 @@ private fun PixiPetCanvas(
                         PixiPetMood.DRAG -> -er * 0.15f
                         else -> 0f
                     }
+                    val eyeWhite = if (nightMode) Color(200, 205, 220) else Color.White
+                    val pupilColor = if (nightMode) Color(40, 45, 60) else Color(30, 35, 50)
                     drawCircle(
-                        color = Color.White,
+                        color = eyeWhite,
                         radius = er,
                         center = Offset(ex, ey)
                     )
                     drawCircle(
-                        color = Color(30, 35, 50),
+                        color = pupilColor,
                         radius = er * 0.48f,
                         center = Offset(ex, ey + look)
                     )
@@ -398,8 +438,10 @@ private fun PixiPetCanvas(
             val br = w * 0.88f
             val by = h * 0.96f
             val barWidth = h * 0.055f
+            val barBg = if (nightMode) Color(100, 100, 110, 50) else Color(128, 128, 128, 70)
+            val barFg = if (nightMode) Color(80, 110, 160) else Color(70, 110, 220)
             drawLine(
-                color = Color(128, 128, 128, 70),
+                color = barBg,
                 start = Offset(bl, by),
                 end = Offset(br, by),
                 strokeWidth = barWidth,
@@ -407,7 +449,7 @@ private fun PixiPetCanvas(
             )
             if (downloadProgress in 0..100) {
                 drawLine(
-                    color = Color(70, 110, 220),
+                    color = barFg,
                     start = Offset(bl, by),
                     end = Offset(bl + (br - bl) * downloadProgress / 100f, by),
                     strokeWidth = barWidth,
@@ -416,7 +458,7 @@ private fun PixiPetCanvas(
             } else {
                 val s0 = bl + (br - bl) * ((t * 1.3f) % 1f) * 0.65f
                 drawLine(
-                    color = Color(70, 110, 220),
+                    color = barFg,
                     start = Offset(s0, by),
                     end = Offset(s0 + (br - bl) * 0.28f, by),
                     strokeWidth = barWidth,

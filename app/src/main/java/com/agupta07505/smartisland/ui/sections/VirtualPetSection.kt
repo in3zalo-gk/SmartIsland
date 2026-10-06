@@ -80,7 +80,7 @@ fun VirtualPetSection(
         }
 
         if (settings.enableVirtualPet) {
-            // Pet Size
+            // --- Pet Size ---
             var petSize by remember { mutableStateOf(settings.petSize) }
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -116,7 +116,7 @@ fun VirtualPetSection(
                 }
             }
 
-            // Sleep Timeout
+            // --- Sleep Timeout ---
             var sleepTimeout by remember { mutableStateOf(settings.petSleepTimeoutSec.toFloat()) }
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -152,7 +152,138 @@ fun VirtualPetSection(
                 }
             }
 
-            // Mood Guide
+            // --- Night Mode ---
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Night Mode",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Softer, darker colors during nighttime to avoid eye strain.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = settings.petNightModeEnabled,
+                            onCheckedChange = { value ->
+                                scope.launch { repository.setPetNightModeEnabled(value) }
+                            }
+                        )
+                    }
+
+                    if (settings.petNightModeEnabled) {
+                        // Start hour
+                        var startHour by remember { mutableStateOf(settings.petNightModeStartHour.toFloat()) }
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = "Starts at ${startHour.toInt()}:00",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Slider(
+                                value = startHour,
+                                onValueChange = { startHour = it },
+                                valueRange = 0f..23f,
+                                steps = 22,
+                                onValueChangeFinished = {
+                                    scope.launch { repository.setPetNightModeStartHour(startHour.toInt()) }
+                                }
+                            )
+                        }
+
+                        // End hour
+                        var endHour by remember { mutableStateOf(settings.petNightModeEndHour.toFloat()) }
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = "Ends at ${endHour.toInt()}:00",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Slider(
+                                value = endHour,
+                                onValueChange = { endHour = it },
+                                valueRange = 0f..23f,
+                                steps = 22,
+                                onValueChangeFinished = {
+                                    scope.launch { repository.setPetNightModeEndHour(endHour.toInt()) }
+                                }
+                            )
+                        }
+
+                        val activeStatus = if (isCurrentlyNightTime(
+                                settings.petNightModeStartHour,
+                                settings.petNightModeEndHour
+                            )) "Currently active" else "Currently inactive"
+                        Text(
+                            text = activeStatus,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // --- Reset Position ---
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Reset Pet Position",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "Move the pet back to its default location.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            scope.launch { repository.setPetPosition(24f, 80f) }
+                        }
+                    ) {
+                        Text("Reset", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // --- Interactions Guide ---
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -191,5 +322,14 @@ fun VirtualPetSection(
                 }
             }
         }
+    }
+}
+
+private fun isCurrentlyNightTime(startHour: Int, endHour: Int): Boolean {
+    val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    return if (startHour <= endHour) {
+        hour in startHour..endHour
+    } else {
+        hour >= startHour || hour < endHour
     }
 }

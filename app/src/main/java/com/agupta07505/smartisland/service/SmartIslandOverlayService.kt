@@ -812,6 +812,9 @@ class SmartIslandOverlayService : AccessibilityService() {
                         petSize = settings.petSize.dp,
                         sleepTimeoutSec = settings.petSleepTimeoutSec,
                         events = petEvents,
+                        nightModeEnabled = settings.petNightModeEnabled,
+                        nightModeStartHour = settings.petNightModeStartHour,
+                        nightModeEndHour = settings.petNightModeEndHour,
                         onDragOffset = { dx, dy ->
                             petParams?.let { p ->
                                 p.x += dx
