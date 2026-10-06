@@ -307,9 +307,11 @@ fun VirtualPetSection(
                         "Tap twice — Dizzy spin",
                         "Tap three times — Annoyed",
                         "Drag — Reposition (saved)",
-                        "Notification — Alert shake",
-                        "Charging — Charge bounce",
-                        "Download — Progress bar",
+                        "Notifications — app icon + short alert shake",
+                        "Charging — Smart Island Bolt badge + bounce",
+                        "Low battery — Battery Alert badge",
+                        "Downloads — Smart glyph + progress ring and bar",
+                        "Calls, music and system activities — matching Smart glyph",
                         "Inactivity — Falls asleep"
                     )
                     tips.forEach { tip ->
