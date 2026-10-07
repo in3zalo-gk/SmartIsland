@@ -36,22 +36,6 @@ private val Context.smartIslandDataStore by preferencesDataStore(
 )
 
 class SmartIslandSettingsRepository(private val context: Context) {
-    private companion object {
-        val VALID_APPEARANCE_PRESETS = setOf(
-            SmartIslandSettings.THEME_MATERIAL_YOU, SmartIslandSettings.THEME_ONE_UI,
-            SmartIslandSettings.THEME_IOS, SmartIslandSettings.THEME_CAVE
-        )
-        val VALID_FONT_STYLES = setOf(
-            SmartIslandSettings.FONT_SYSTEM, SmartIslandSettings.FONT_SERIF, SmartIslandSettings.FONT_MONO
-        )
-        val VALID_ICON_SHAPES = setOf(
-            SmartIslandSettings.ICON_ROUNDED, SmartIslandSettings.ICON_CIRCLE, SmartIslandSettings.ICON_SQUARE
-        )
-        val VALID_AI_PROVIDERS = setOf(
-            SmartIslandSettings.AI_PROVIDER_OPENAI, SmartIslandSettings.AI_PROVIDER_ANTHROPIC, SmartIslandSettings.AI_PROVIDER_GEMINI
-        )
-    }
-
     private object Keys {
         val Enabled = booleanPreferencesKey("enabled")
         val Width = floatPreferencesKey("width")
@@ -837,6 +821,19 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val VALID_CIRCLE_POSITIONS = setOf(
             SmartIslandSettings.CIRCLE_POSITION_RIGHT,
             SmartIslandSettings.CIRCLE_POSITION_LEFT
+        )
+        val VALID_APPEARANCE_PRESETS = setOf(
+            SmartIslandSettings.THEME_MATERIAL_YOU, SmartIslandSettings.THEME_ONE_UI,
+            SmartIslandSettings.THEME_IOS, SmartIslandSettings.THEME_CAVE
+        )
+        val VALID_FONT_STYLES = setOf(
+            SmartIslandSettings.FONT_SYSTEM, SmartIslandSettings.FONT_SERIF, SmartIslandSettings.FONT_MONO
+        )
+        val VALID_ICON_SHAPES = setOf(
+            SmartIslandSettings.ICON_ROUNDED, SmartIslandSettings.ICON_CIRCLE, SmartIslandSettings.ICON_SQUARE
+        )
+        val VALID_AI_PROVIDERS = setOf(
+            SmartIslandSettings.AI_PROVIDER_OPENAI, SmartIslandSettings.AI_PROVIDER_ANTHROPIC, SmartIslandSettings.AI_PROVIDER_GEMINI
         )
     }
 }
