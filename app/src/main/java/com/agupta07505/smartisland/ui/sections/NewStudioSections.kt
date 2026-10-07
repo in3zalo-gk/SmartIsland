@@ -6,6 +6,8 @@
 package com.agupta07505.smartisland.ui.sections
 
 import android.content.Context
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,13 +59,18 @@ fun IslandStudioSection(settings: SmartIslandSettings, repository: SmartIslandSe
     var widthScale by remember(settings.expandedWidthScale) { mutableFloatStateOf(settings.expandedWidthScale) }
     var radius by remember(settings.expandedCornerRadius) { mutableFloatStateOf(settings.expandedCornerRadius) }
     val scope = rememberCoroutineScope()
+    val previewDamping = when (settings.animationStyle) { SmartIslandSettings.ANIMATION_STYLE_BOUNCY -> 0.64f; SmartIslandSettings.ANIMATION_STYLE_SPRING -> 0.78f; else -> 0.92f }
+    val previewStiffness = (500f * settings.animationSpeed * settings.animationSpeed * (280f / settings.animationDurationMs).let { it * it }).coerceIn(120f, 1200f)
+    val islandPreviewWidth by animateDpAsState(if (expanded) 260.dp else 132.dp, animationSpec = spring(dampingRatio = previewDamping, stiffness = previewStiffness), label = "studioIslandWidth")
+    val islandPreviewHeight by animateDpAsState(if (expanded) 92.dp else 36.dp, animationSpec = spring(dampingRatio = previewDamping, stiffness = previewStiffness), label = "studioIslandHeight")
+    val islandPreviewRadius by animateDpAsState(if (expanded) radius.dp else settings.cornerRadius.dp, animationSpec = spring(dampingRatio = previewDamping, stiffness = previewStiffness), label = "studioIslandRadius")
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = MaterialTheme.shapes.large) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Live island preview", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text("Preview both compact and expanded states. This is a visual sample; actual content depends on notifications and active modes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Box(Modifier.fillMaxWidth().height(148.dp).clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.TopCenter) {
-                    Box(Modifier.padding(top = 16.dp).size(width = if (expanded) 260.dp else 132.dp, height = if (expanded) 92.dp else 36.dp).clip(RoundedCornerShape(if (expanded) radius.dp else settings.cornerRadius.dp)).background(Color(settings.pillColor).copy(alpha = settings.opacity)), contentAlignment = Alignment.Center) {
+                    Box(Modifier.padding(top = 16.dp).size(width = islandPreviewWidth, height = islandPreviewHeight).clip(RoundedCornerShape(islandPreviewRadius)).background(Color(settings.pillColor).copy(alpha = settings.opacity)), contentAlignment = Alignment.Center) {
                         Text(if (expanded) "♪  Now playing     02:34" else "●  Smart Island", color = Color.White, style = MaterialTheme.typography.labelMedium)
                     }
                 }
@@ -90,6 +97,10 @@ fun AnimationStudioSection(settings: SmartIslandSettings, repository: SmartIslan
     var duration by remember(settings.animationDurationMs) { mutableFloatStateOf(settings.animationDurationMs.toFloat()) }
     var speed by remember(settings.animationSpeed) { mutableFloatStateOf(settings.animationSpeed) }
     var demoExpanded by remember { mutableStateOf(false) }
+    val demoDamping = when (settings.animationStyle) { SmartIslandSettings.ANIMATION_STYLE_BOUNCY -> 0.64f; SmartIslandSettings.ANIMATION_STYLE_SPRING -> 0.78f; else -> 0.92f }
+    val demoStiffness = (500f * speed * speed * (280f / duration.coerceAtLeast(1f)).let { it * it }).coerceIn(120f, 1200f)
+    val demoWidth by animateDpAsState(if (demoExpanded) 220.dp else 110.dp, animationSpec = spring(dampingRatio = demoDamping, stiffness = demoStiffness), label = "motionPreviewWidth")
+    val demoHeight by animateDpAsState(if (demoExpanded) 68.dp else 34.dp, animationSpec = spring(dampingRatio = demoDamping, stiffness = demoStiffness), label = "motionPreviewHeight")
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = MaterialTheme.shapes.large) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -103,7 +114,7 @@ fun AnimationStudioSection(settings: SmartIslandSettings, repository: SmartIslan
                 SliderSettingItem("Duration", duration, SmartIslandSettings.MIN_ANIMATION_DURATION_MS.toFloat()..SmartIslandSettings.MAX_ANIMATION_DURATION_MS.toFloat(), { duration = it }, suffix = "ms", step = 20f, onValueChangeFinished = { scope.launch { repository.setAnimationDurationMs(duration.toInt()) } })
                 SliderSettingItem("Speed", speed * 100f, SmartIslandSettings.MIN_ANIMATION_SPEED * 100f..SmartIslandSettings.MAX_ANIMATION_SPEED * 100f, { speed = it / 100f }, suffix = "%", step = 5f, onValueChangeFinished = { scope.launch { repository.setAnimationSpeed(speed) } })
                 Box(Modifier.fillMaxWidth().height(112.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(width = if (demoExpanded) 220.dp else 110.dp, height = if (demoExpanded) 68.dp else 34.dp).clip(RoundedCornerShape(if (demoExpanded) settings.expandedCornerRadius.dp else settings.cornerRadius.dp)).background(Color(settings.pillColor)), contentAlignment = Alignment.Center) { Text(if (demoExpanded) "Expanded" else "Compact", color = Color.White) }
+                    Box(Modifier.size(width = demoWidth, height = demoHeight).clip(RoundedCornerShape(if (demoExpanded) settings.expandedCornerRadius.dp else settings.cornerRadius.dp)).background(Color(settings.pillColor)), contentAlignment = Alignment.Center) { Text(if (demoExpanded) "Expanded" else "Compact", color = Color.White) }
                 }
                 OutlinedButton(onClick = { demoExpanded = !demoExpanded }, modifier = Modifier.fillMaxWidth()) { Text("Replay preview") }
             }

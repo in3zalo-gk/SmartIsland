@@ -90,7 +90,16 @@ fun OverlayIsland(
         }
     }
 
-    IslandOverlayView(
+    SmartIslandTheme(
+        appearancePreset = settings.appearancePreset,
+        dynamicColor = settings.dynamicColorsEnabled,
+        useCustomAccentColor = settings.useCustomAccentColor,
+        accentColor = settings.appAccentColor,
+        fontStyle = settings.fontStyle,
+        fontScale = settings.fontScale,
+        iconShape = settings.iconShape
+    ) {
+        IslandOverlayView(
         settings = settings,
         expanded = expanded,
         notifications = processedNotifications,
@@ -110,5 +119,6 @@ fun OverlayIsland(
         onReplyStateChanged = { viewModel.setInputActive(it) },
         isFullWidth = isFullWidth,
         modifier = modifier
-    )
+        )
+    }
 }
