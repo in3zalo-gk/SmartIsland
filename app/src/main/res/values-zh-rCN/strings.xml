@@ -601,4 +601,13 @@
     <string name="circle_position_left">左侧</string>
     <string name="circle_position_left_desc">推荐右置挖孔屏设备使用</string>
     <string name="toast_circle_position_updated">次级小圆圈已放置在%1$s</string>
+
+    <!-- Material You motion controls -->
+    <string name="motion_card_title">动态与动画</string>
+    <string name="motion_card_description">调整灵动岛动画的风格和速度。</string>
+    <string name="motion_style_label">动画风格</string>
+    <string name="motion_style_gentle">平滑</string>
+    <string name="motion_style_spring">弹簧</string>
+    <string name="motion_style_bouncy">弹性</string>
+    <string name="motion_speed_label">动画速度</string>
 </resources>

@@ -601,4 +601,13 @@
     <string name="circle_position_left">Lado Esquerdo</string>
     <string name="circle_position_left_desc">Recomendado para câmeras punch hole alinhadas à direita</string>
     <string name="toast_circle_position_updated">Círculo auxiliar posicionado no %1$s</string>
+
+    <!-- Material You motion controls -->
+    <string name="motion_card_title">Movimento e animações</string>
+    <string name="motion_card_description">Escolha o estilo e a velocidade das transições da ilha.</string>
+    <string name="motion_style_label">Estilo da animação</string>
+    <string name="motion_style_gentle">Suave</string>
+    <string name="motion_style_spring">Mola</string>
+    <string name="motion_style_bouncy">Elástica</string>
+    <string name="motion_speed_label">Velocidade da animação</string>
 </resources>

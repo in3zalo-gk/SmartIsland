@@ -601,4 +601,13 @@
     <string name="circle_position_left">Left Side</string>
     <string name="circle_position_left_desc">Recommended for right-aligned camera punch holes</string>
     <string name="toast_circle_position_updated">Companion circle placed on %1$s</string>
+
+    <!-- Material You motion controls -->
+    <string name="motion_card_title">Motion &amp; animation</string>
+    <string name="motion_card_description">Set the feel and speed of island transitions.</string>
+    <string name="motion_style_label">Animation style</string>
+    <string name="motion_style_gentle">Smooth</string>
+    <string name="motion_style_spring">Spring</string>
+    <string name="motion_style_bouncy">Bouncy</string>
+    <string name="motion_speed_label">Animation speed</string>
 </resources>

@@ -85,7 +85,9 @@ data class SmartIslandSettings(
     val petSleepTimeoutSec: Int = 45,
     val petNightModeEnabled: Boolean = false,
     val petNightModeStartHour: Int = 22,
-    val petNightModeEndHour: Int = 7
+    val petNightModeEndHour: Int = 7,
+    val animationStyle: String = ANIMATION_STYLE_GENTLE,
+    val animationSpeed: Float = 1f
 ) {
     fun toJson(appVersion: String = ""): String {
         val root = JSONObject()
@@ -187,6 +189,8 @@ data class SmartIslandSettings(
         settingsObj.put("petNightModeEnabled", petNightModeEnabled)
         settingsObj.put("petNightModeStartHour", petNightModeStartHour)
         settingsObj.put("petNightModeEndHour", petNightModeEndHour)
+        settingsObj.put("animationStyle", animationStyle)
+        settingsObj.put("animationSpeed", animationSpeed.toDouble())
 
         root.put("settings", settingsObj)
         return root.toString(2)
@@ -202,6 +206,9 @@ data class SmartIslandSettings(
     companion object {
         const val CIRCLE_POSITION_RIGHT = "right"
         const val CIRCLE_POSITION_LEFT = "left"
+        const val ANIMATION_STYLE_GENTLE = "gentle"
+        const val ANIMATION_STYLE_SPRING = "spring"
+        const val ANIMATION_STYLE_BOUNCY = "bouncy"
 
         val Default = SmartIslandSettings()
 
@@ -221,6 +228,8 @@ data class SmartIslandSettings(
         const val MAX_OPACITY = 1f
         const val MIN_SHADOW_ELEVATION = 0f
         const val MAX_SHADOW_ELEVATION = 32f
+        const val MIN_ANIMATION_SPEED = 0.6f
+        const val MAX_ANIMATION_SPEED = 1.6f
         const val MIN_PET_SIZE = 32f
         const val MAX_PET_SIZE = 128f
         const val MIN_PET_X = 0f
@@ -355,7 +364,11 @@ data class SmartIslandSettings(
                 petSleepTimeoutSec = obj.optInt("petSleepTimeoutSec", defaults.petSleepTimeoutSec).coerceIn(5, 600),
                 petNightModeEnabled = obj.optBoolean("petNightModeEnabled", defaults.petNightModeEnabled),
                 petNightModeStartHour = obj.optInt("petNightModeStartHour", defaults.petNightModeStartHour).coerceIn(0, 23),
-                petNightModeEndHour = obj.optInt("petNightModeEndHour", defaults.petNightModeEndHour).coerceIn(0, 23)
+                petNightModeEndHour = obj.optInt("petNightModeEndHour", defaults.petNightModeEndHour).coerceIn(0, 23),
+                animationStyle = obj.optString("animationStyle", defaults.animationStyle).let {
+                    if (it in setOf(ANIMATION_STYLE_GENTLE, ANIMATION_STYLE_SPRING, ANIMATION_STYLE_BOUNCY)) it else defaults.animationStyle
+                },
+                animationSpeed = safeFloat("animationSpeed", defaults.animationSpeed, MIN_ANIMATION_SPEED, MAX_ANIMATION_SPEED)
             )
         }
     }

@@ -112,6 +112,8 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val PetNightModeEnabled = booleanPreferencesKey("pet_night_mode_enabled")
         val PetNightModeStartHour = intPreferencesKey("pet_night_mode_start_hour")
         val PetNightModeEndHour = intPreferencesKey("pet_night_mode_end_hour")
+        val AnimationStyle = stringPreferencesKey("animation_style")
+        val AnimationSpeed = floatPreferencesKey("animation_speed")
     }
 
     val settings: Flow<SmartIslandSettings> = context.smartIslandDataStore.data
@@ -260,7 +262,12 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 petSleepTimeoutSec = prefs[Keys.PetSleepTimeoutSec] ?: defaults.petSleepTimeoutSec,
                 petNightModeEnabled = prefs[Keys.PetNightModeEnabled] ?: defaults.petNightModeEnabled,
                 petNightModeStartHour = prefs[Keys.PetNightModeStartHour] ?: defaults.petNightModeStartHour,
-                petNightModeEndHour = prefs[Keys.PetNightModeEndHour] ?: defaults.petNightModeEndHour
+                petNightModeEndHour = prefs[Keys.PetNightModeEndHour] ?: defaults.petNightModeEndHour,
+                animationStyle = prefs[Keys.AnimationStyle] ?: defaults.animationStyle,
+                animationSpeed = validDimension(
+                    prefs[Keys.AnimationSpeed], defaults.animationSpeed,
+                    SmartIslandSettings.MIN_ANIMATION_SPEED, SmartIslandSettings.MAX_ANIMATION_SPEED
+                )
             )
         }
 
@@ -541,6 +548,19 @@ class SmartIslandSettingsRepository(private val context: Context) {
     suspend fun setPetNightModeEnabled(value: Boolean) = editSafely { it[Keys.PetNightModeEnabled] = value }
     suspend fun setPetNightModeStartHour(value: Int) = editSafely { it[Keys.PetNightModeStartHour] = value.coerceIn(0, 23) }
     suspend fun setPetNightModeEndHour(value: Int) = editSafely { it[Keys.PetNightModeEndHour] = value.coerceIn(0, 23) }
+    suspend fun setAnimationStyle(value: String) = editSafely {
+        it[Keys.AnimationStyle] = value.takeIf { style -> style in setOf(
+            SmartIslandSettings.ANIMATION_STYLE_GENTLE,
+            SmartIslandSettings.ANIMATION_STYLE_SPRING,
+            SmartIslandSettings.ANIMATION_STYLE_BOUNCY
+        ) } ?: SmartIslandSettings.ANIMATION_STYLE_GENTLE
+    }
+    suspend fun setAnimationSpeed(value: Float) = editSafely {
+        it[Keys.AnimationSpeed] = validDimension(
+            value, SmartIslandSettings.Default.animationSpeed,
+            SmartIslandSettings.MIN_ANIMATION_SPEED, SmartIslandSettings.MAX_ANIMATION_SPEED
+        )
+    }
     suspend fun toggleNotificationCooldownExcludedPackage(packageName: String) = editSafely { prefs ->
         val current = prefs[Keys.NotificationCooldownExcludedPackages] ?: emptySet()
         prefs[Keys.NotificationCooldownExcludedPackages] = if (packageName in current) {
@@ -687,6 +707,15 @@ class SmartIslandSettingsRepository(private val context: Context) {
         prefs[Keys.PetNightModeEnabled] = settings.petNightModeEnabled
         prefs[Keys.PetNightModeStartHour] = settings.petNightModeStartHour.coerceIn(0, 23)
         prefs[Keys.PetNightModeEndHour] = settings.petNightModeEndHour.coerceIn(0, 23)
+        prefs[Keys.AnimationStyle] = settings.animationStyle.takeIf { style -> style in setOf(
+            SmartIslandSettings.ANIMATION_STYLE_GENTLE,
+            SmartIslandSettings.ANIMATION_STYLE_SPRING,
+            SmartIslandSettings.ANIMATION_STYLE_BOUNCY
+        ) } ?: SmartIslandSettings.ANIMATION_STYLE_GENTLE
+        prefs[Keys.AnimationSpeed] = validDimension(
+            settings.animationSpeed, SmartIslandSettings.Default.animationSpeed,
+            SmartIslandSettings.MIN_ANIMATION_SPEED, SmartIslandSettings.MAX_ANIMATION_SPEED
+        )
     }
 
     suspend fun resetAllSettings() = restoreSettings(SmartIslandSettings.Default.copy(welcomeDialogShown = true))

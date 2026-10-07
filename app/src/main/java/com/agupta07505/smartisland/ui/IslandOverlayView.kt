@@ -11,6 +11,7 @@ import com.agupta07505.smartisland.data.SmartIslandCommand
 import com.agupta07505.smartisland.model.SwipeAction
 import com.agupta07505.smartisland.ui.expanded.IslandExpandedContent
 import com.agupta07505.smartisland.ui.expanded.trySendFirstAction
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDp
@@ -97,6 +98,7 @@ fun IslandOverlayView(
     onLaunchApp: (String) -> Unit,
     onToggleExpanded: () -> Unit,
     onDismissNotification: () -> Unit,
+    onDismissNotificationByKey: (String) -> Unit = {},
     onOpenFloatingWindow: () -> Unit,
     onOpenNotificationShade: () -> Unit = {},
     statusBarHeight: Float,
@@ -110,6 +112,7 @@ fun IslandOverlayView(
     // even though pointerInput(Unit) never restarts its coroutine
     val currentOnToggle by rememberUpdatedState(onToggleExpanded)
     val currentOnDismiss by rememberUpdatedState(onDismissNotification)
+    val currentOnDismissByKey by rememberUpdatedState(onDismissNotificationByKey)
     val currentOnDismissAll by rememberUpdatedState(onDismissAllNotifications)
     val currentOnOpenFloatingWindow by rememberUpdatedState(onOpenFloatingWindow)
     val currentOnOpenNotificationShade by rememberUpdatedState(onOpenNotificationShade)
@@ -125,6 +128,7 @@ fun IslandOverlayView(
     val scope = rememberCoroutineScope()
     var dragOffset by remember { mutableStateOf(0f) }
     var pillDragOffsetX by remember { mutableStateOf(0f) }
+    val dismissSwipeAnim = remember { Animatable(0f) }
 
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -140,20 +144,35 @@ fun IslandOverlayView(
     ).dp
     val transition = updateTransition(targetState = expanded, label = "islandTransition")
 
+    val motionSpeed = settings.animationSpeed.coerceIn(
+        SmartIslandSettings.MIN_ANIMATION_SPEED,
+        SmartIslandSettings.MAX_ANIMATION_SPEED
+    )
+    val motionDamping = when (settings.animationStyle) {
+        SmartIslandSettings.ANIMATION_STYLE_BOUNCY -> 0.64f
+        SmartIslandSettings.ANIMATION_STYLE_SPRING -> 0.78f
+        else -> 0.92f
+    }
+    val baseStiffness = when (settings.animationStyle) {
+        SmartIslandSettings.ANIMATION_STYLE_BOUNCY -> 430f
+        SmartIslandSettings.ANIMATION_STYLE_SPRING -> 500f
+        else -> 340f
+    }
+    val motionStiffness = (baseStiffness * motionSpeed * motionSpeed).coerceIn(120f, 1200f)
     val sizeSpec = spring<androidx.compose.ui.unit.Dp>(
-        dampingRatio = 0.72f,
-        stiffness = 520f
+        dampingRatio = motionDamping,
+        stiffness = motionStiffness
     )
     val sizeSpecFloat = spring<Float>(
-        dampingRatio = 0.72f,
-        stiffness = 520f
+        dampingRatio = motionDamping,
+        stiffness = motionStiffness
     )
     val heightSpec = spring<androidx.compose.ui.unit.Dp>(
-        dampingRatio = 0.76f,
-        stiffness = 520f
+        dampingRatio = (motionDamping + 0.04f).coerceAtMost(1f),
+        stiffness = motionStiffness * 0.92f
     )
     val alphaSpec = tween<Float>(
-        durationMillis = 190,
+        durationMillis = (190f / motionSpeed).toInt().coerceIn(110, 360),
         easing = FastOutSlowInEasing
     )
 
@@ -221,6 +240,7 @@ fun IslandOverlayView(
     LaunchedEffect(notifications.map { it.key }, selectedIndex) {
         isAutoHidden = false
         userInteractionTimestamp = System.currentTimeMillis()
+        if (dismissSwipeAnim.value != 0f) dismissSwipeAnim.snapTo(0f)
     }
 
     // Auto-hide countdown timer when pill is collapsed and autoHidePill is enabled
@@ -299,13 +319,13 @@ fun IslandOverlayView(
             lastSelectedIndex = selectedIndex
             switchScaleAnim.animateTo(
                 targetValue = 0.92f,
-                animationSpec = tween(40, easing = FastOutSlowInEasing)
+                animationSpec = tween((45f / motionSpeed).toInt().coerceAtLeast(1), easing = FastOutSlowInEasing)
             )
             switchScaleAnim.animateTo(
                 targetValue = 1f,
                 animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = 650f
+                    dampingRatio = motionDamping,
+                    stiffness = motionStiffness
                 )
             )
         }
@@ -333,17 +353,17 @@ fun IslandOverlayView(
 
     val secondaryAlpha by animateFloatAsState(
         targetValue = if (isSplitMode && !isHiding) 1f else 0f,
-        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = (180f / motionSpeed).toInt().coerceIn(100, 360), easing = FastOutSlowInEasing),
         label = "secondaryAlpha"
     )
     val secondaryScale by animateFloatAsState(
         targetValue = if (isSplitMode && !isHiding) 1f else 0.3f,
-        animationSpec = spring(dampingRatio = 0.68f, stiffness = 480f),
+        animationSpec = spring(dampingRatio = motionDamping, stiffness = motionStiffness),
         label = "secondaryScale"
     )
     val secondaryBubbleWidth by animateDpAsState(
         targetValue = if (secondaryIsPill) miniPillWidth else circleSize,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 520f),
+        animationSpec = spring(dampingRatio = motionDamping, stiffness = motionStiffness),
         label = "secondaryBubbleWidth"
     )
     val secondaryPillProgress = (miniPillWidth - circleSize).value.let { widthDelta ->
@@ -355,17 +375,17 @@ fun IslandOverlayView(
     }
     val secondaryBubbleCorner by animateDpAsState(
         targetValue = if (secondaryIsPill) settings.cornerRadius.dp else circleSize / 2f,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 520f),
+        animationSpec = spring(dampingRatio = motionDamping, stiffness = motionStiffness),
         label = "secondaryBubbleCorner"
     )
     val tertiaryAlpha by animateFloatAsState(
         targetValue = if (showTertiaryPill && !isHiding) 1f else 0f,
-        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = (180f / motionSpeed).toInt().coerceIn(100, 360), easing = FastOutSlowInEasing),
         label = "tertiaryAlpha"
     )
     val tertiaryScale by animateFloatAsState(
         targetValue = if (showTertiaryPill && !isHiding) 1f else 0.3f,
-        animationSpec = spring(dampingRatio = 0.68f, stiffness = 480f),
+        animationSpec = spring(dampingRatio = motionDamping, stiffness = motionStiffness),
         label = "tertiaryScale"
     )
 
@@ -387,7 +407,7 @@ fun IslandOverlayView(
     ).dp
     val secondaryOffset by animateDpAsState(
         targetValue = if (!expanded) collapsedSecondaryOffset else secondaryExpandedOffset,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 520f),
+        animationSpec = spring(dampingRatio = motionDamping, stiffness = motionStiffness),
         label = "secondaryOffset"
     )
 
@@ -453,7 +473,8 @@ fun IslandOverlayView(
                 .width(safeWidth)
                 .height(safeHeight)
                 .graphicsLayer {
-                    translationX = animatedXOffset.toPx() + (if (!currentExpanded) pillDragOffsetX else 0f)
+                    translationX = animatedXOffset.toPx() +
+                        (if (!currentExpanded) pillDragOffsetX else dismissSwipeAnim.value)
                     translationY = yOffset.toPx() + dragOffset
                     scaleX = switchScaleAnim.value
                     scaleY = switchScaleAnim.value
@@ -483,11 +504,14 @@ fun IslandOverlayView(
                         userInteractionTimestamp = System.currentTimeMillis()
                         val pressTimeMs = System.currentTimeMillis()
                         val wasExpandedAtStart = currentExpanded
+                        val notificationAtGestureStart = currentNotifications.getOrNull(currentSelectedIndex)
+                        if (wasExpandedAtStart && dismissSwipeAnim.value != 0f) dismissSwipeAnim.snapTo(0f)
                         var isHoldRegistered = false
                         var dragAccumulatorY = 0f
                         var dragAccumulatorX = 0f
                         var isDragging = false
                         var pillGestureTriggered = false
+                        var dismissedBySideSwipe = false
 
                         val holdJob = scope.launch {
                             kotlinx.coroutines.delay(HOLD_GESTURE_THRESHOLD_MS)
@@ -510,7 +534,23 @@ fun IslandOverlayView(
                                 if (wasExpandedAtStart) {
                                     val swipeUpThreshold = -SWIPE_THRESHOLD_DP * displayMetrics.density
                                     val swipeDownThreshold = SWIPE_THRESHOLD_DP * displayMetrics.density
-                                    if (isDragging && currentSettings.enableSwipeActions && dragOffset < swipeUpThreshold) {
+                                    val sideDismissThreshold = SWIPE_THRESHOLD_DP * displayMetrics.density * 1.25f
+                                    val horizontalDominant = abs(dragAccumulatorX) > abs(dragAccumulatorY)
+                                    if (
+                                        isDragging && currentSettings.enableSwipeActions && notificationAtGestureStart != null &&
+                                        horizontalDominant && abs(dragAccumulatorX) >= sideDismissThreshold
+                                    ) {
+                                        val exitX = if (dragAccumulatorX < 0f) -displayMetrics.widthPixels.toFloat() else displayMetrics.widthPixels.toFloat()
+                                        dismissSwipeAnim.animateTo(
+                                            targetValue = exitX,
+                                            animationSpec = tween(
+                                                durationMillis = (170f / motionSpeed).toInt().coerceIn(100, 300),
+                                                easing = FastOutSlowInEasing
+                                            )
+                                        )
+                                        currentOnDismissByKey(notificationAtGestureStart.key)
+                                        dismissedBySideSwipe = true
+                                    } else if (isDragging && currentSettings.enableSwipeActions && dragOffset < swipeUpThreshold) {
                                         val isHold = isHoldRegistered || totalElapsedMs >= HOLD_GESTURE_THRESHOLD_MS
                                         val actionStr = if (isHold) currentSettings.swipeHoldUpAction else currentSettings.swipeUpAction
                                         val action = SwipeAction.fromId(actionStr, if (isHold) SwipeAction.DismissAll else SwipeAction.DismissCurrent)
@@ -658,10 +698,17 @@ fun IslandOverlayView(
                                         holdJob.cancel()
                                     }
                                     if (wasExpandedAtStart) {
-                                        dragOffset = dragAccumulatorY.coerceIn(
-                                            -DRAG_MAX_OFFSET_DP * displayMetrics.density,
-                                            DRAG_MAX_OFFSET_DP * displayMetrics.density
-                                        )
+                                        if (abs(dragAccumulatorX) > abs(dragAccumulatorY)) {
+                                            val maxDismissDrag = displayMetrics.widthPixels * 0.45f
+                                            dismissSwipeAnim.snapTo(dragAccumulatorX.coerceIn(-maxDismissDrag, maxDismissDrag))
+                                            dragOffset = 0f
+                                        } else {
+                                            if (dismissSwipeAnim.value != 0f) dismissSwipeAnim.snapTo(0f)
+                                            dragOffset = dragAccumulatorY.coerceIn(
+                                                -DRAG_MAX_OFFSET_DP * displayMetrics.density,
+                                                DRAG_MAX_OFFSET_DP * displayMetrics.density
+                                            )
+                                        }
                                     } else {
                                         pillDragOffsetX = (dragAccumulatorX * 0.35f).coerceIn(
                                             -24f * displayMetrics.density,
@@ -766,12 +813,23 @@ fun IslandOverlayView(
                                 androidx.compose.animation.core.Animatable(startPillOffset).animateTo(
                                     targetValue = 0f,
                                     animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessMedium
+                                        dampingRatio = motionDamping,
+                                        stiffness = motionStiffness
                                     )
                                 ) {
                                     pillDragOffsetX = value
                                 }
+                            }
+                        }
+                        if (dismissSwipeAnim.value != 0f && !dismissedBySideSwipe) {
+                            scope.launch {
+                                dismissSwipeAnim.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = spring(
+                                        dampingRatio = motionDamping,
+                                        stiffness = motionStiffness
+                                    )
+                                )
                             }
                         }
                         if (dragOffset != 0f) {
@@ -780,8 +838,8 @@ fun IslandOverlayView(
                                 androidx.compose.animation.core.Animatable(startDrag).animateTo(
                                     targetValue = 0f,
                                     animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessMedium
+                                        dampingRatio = motionDamping,
+                                        stiffness = motionStiffness
                                     )
                                 ) {
                                     dragOffset = value

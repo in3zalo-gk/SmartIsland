@@ -200,6 +200,14 @@ class IslandViewModel(
         collapse()
     }
 
+    fun dismissNotification(key: String) {
+        if (visibleNotifications.value.any { it.key == key }) {
+            notificationRepo.removeNotification(key)
+            notificationRepo.sendCommand(SmartIslandCommand.CancelNotification(key))
+        }
+        collapse()
+    }
+
     fun dismissAllNotifications() {
         val list = visibleNotifications.value
         for (notification in list) {

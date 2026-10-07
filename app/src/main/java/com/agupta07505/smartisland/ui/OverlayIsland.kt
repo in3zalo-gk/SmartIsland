@@ -101,6 +101,7 @@ fun OverlayIsland(
         onLaunchApp = onLaunchApp,
         onToggleExpanded = { viewModel.toggleExpanded() },
         onDismissNotification = { viewModel.dismissCurrentNotification() },
+        onDismissNotificationByKey = { key -> viewModel.dismissNotification(key) },
         onDismissAllNotifications = { viewModel.dismissAllNotifications() },
         onOpenFloatingWindow = onOpenFloatingWindow,
         onOpenNotificationShade = onOpenNotificationShade,

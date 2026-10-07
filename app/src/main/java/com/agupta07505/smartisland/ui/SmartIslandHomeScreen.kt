@@ -477,7 +477,7 @@ private fun StudioTopHeader(
 
         // Live Health Status Badge
         val statusColor = when {
-            !canEnable -> Color(0xFFE88C25) // Action required
+            !canEnable -> MaterialTheme.colorScheme.error // Action required
             isIslandEnabled -> Color(0xFF0F9F6E) // Active
             else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f) // Ready/Off
         }
@@ -526,7 +526,7 @@ private fun MasterPowerCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -567,7 +567,7 @@ private fun MasterPowerCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = onSetupPermissionsClick)
-                    .background(Color(0xFFE88C25).copy(alpha = 0.08f))
+                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.08f))
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -578,12 +578,12 @@ private fun MasterPowerCard(
                     Icon(
                         Icons.Rounded.Warning,
                         contentDescription = null,
-                        tint = Color(0xFFE88C25),
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
                         text = stringResource(R.string.btn_grant_required_permissions),
-                        color = Color(0xFFE88C25),
+                        color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -638,7 +638,7 @@ private fun SimulationLabCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
