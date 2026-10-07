@@ -52,7 +52,12 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run lint, tests, and debug build
-        run: ./gradlew --no-daemon --stacktrace lintDebug testDebugUnitTest assembleDebug
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            ./gradlew --no-daemon --stacktrace clean assembleDebug
+          else
+            ./gradlew --no-daemon --stacktrace lintDebug testDebugUnitTest assembleDebug
+          fi
 
       - name: Upload lint reports
         if: ${{ !cancelled() }}
