@@ -22,4 +22,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Smart Island"
-include(":app")
+include(":app", ":settings-model")

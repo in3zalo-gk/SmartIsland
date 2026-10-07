@@ -112,6 +112,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":settings-model"))
+
     val composeBom = platform("androidx.compose:compose-bom:2026.02.01")
 
     implementation(composeBom)
