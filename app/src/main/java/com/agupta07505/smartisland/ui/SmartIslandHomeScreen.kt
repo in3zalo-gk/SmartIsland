@@ -965,7 +965,7 @@ private fun StudioBottomNavigationBar(
     val tabs = listOf(
         Triple(StudioTab.Home, Icons.Rounded.FlashOn, R.string.tab_studio),
         Triple(StudioTab.Island, Icons.Rounded.Apps, R.string.tab_island),
-        Triple(StudioTab.Theme, Icons.Rounded.Palette, R.string.tab_theme),
+        Triple(StudioTab.Theme, Icons.Rounded.Palette, R.string.tab_appearance),
         Triple(StudioTab.Motion, Icons.Rounded.Gesture, R.string.tab_motion),
         Triple(StudioTab.AI, Icons.Rounded.Explore, R.string.tab_ai),
         Triple(StudioTab.More, Icons.Rounded.Settings, R.string.tab_more)
