@@ -56,7 +56,7 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             ./gradlew --no-daemon clean
             set +e
-            ./gradlew --no-daemon --rerun-tasks --no-build-cache --stacktrace --info kaptDebugKotlin
+            ./gradlew --no-daemon --rerun-tasks --no-build-cache -Pkotlin.incremental=false -Pkapt.incremental.apt=false --stacktrace --info kaptDebugKotlin
             KAPT_STATUS=$?
             set -e
             echo "--- KAPT classes with the affected name ---"
