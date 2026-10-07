@@ -87,7 +87,19 @@ data class SmartIslandSettings(
     val petNightModeStartHour: Int = 22,
     val petNightModeEndHour: Int = 7,
     val animationStyle: String = ANIMATION_STYLE_GENTLE,
-    val animationSpeed: Float = 1f
+    val animationSpeed: Float = 1f,
+    val animationDurationMs: Int = 280,
+    val appearancePreset: String = THEME_MATERIAL_YOU,
+    val dynamicColorsEnabled: Boolean = true,
+    val useCustomAccentColor: Boolean = false,
+    val appAccentColor: Long = 0xFFD84315L,
+    val fontStyle: String = FONT_SYSTEM,
+    val fontScale: Float = 1f,
+    val iconShape: String = ICON_ROUNDED,
+    val expandedWidthScale: Float = 1f,
+    val expandedCornerRadius: Float = 34f,
+    val aiProvider: String = AI_PROVIDER_OPENAI,
+    val aiModel: String = "gpt-4.1-mini"
 ) {
     fun toJson(appVersion: String = ""): String {
         val root = JSONObject()
@@ -191,6 +203,18 @@ data class SmartIslandSettings(
         settingsObj.put("petNightModeEndHour", petNightModeEndHour)
         settingsObj.put("animationStyle", animationStyle)
         settingsObj.put("animationSpeed", animationSpeed.toDouble())
+        settingsObj.put("animationDurationMs", animationDurationMs)
+        settingsObj.put("appearancePreset", appearancePreset)
+        settingsObj.put("dynamicColorsEnabled", dynamicColorsEnabled)
+        settingsObj.put("useCustomAccentColor", useCustomAccentColor)
+        settingsObj.put("appAccentColor", appAccentColor)
+        settingsObj.put("fontStyle", fontStyle)
+        settingsObj.put("fontScale", fontScale.toDouble())
+        settingsObj.put("iconShape", iconShape)
+        settingsObj.put("expandedWidthScale", expandedWidthScale.toDouble())
+        settingsObj.put("expandedCornerRadius", expandedCornerRadius.toDouble())
+        settingsObj.put("aiProvider", aiProvider)
+        settingsObj.put("aiModel", aiModel)
 
         root.put("settings", settingsObj)
         return root.toString(2)
@@ -209,6 +233,19 @@ data class SmartIslandSettings(
         const val ANIMATION_STYLE_GENTLE = "gentle"
         const val ANIMATION_STYLE_SPRING = "spring"
         const val ANIMATION_STYLE_BOUNCY = "bouncy"
+        const val THEME_MATERIAL_YOU = "material_you"
+        const val THEME_ONE_UI = "one_ui"
+        const val THEME_IOS = "ios"
+        const val THEME_CAVE = "cave"
+        const val FONT_SYSTEM = "system"
+        const val FONT_SERIF = "serif"
+        const val FONT_MONO = "mono"
+        const val ICON_ROUNDED = "rounded"
+        const val ICON_CIRCLE = "circle"
+        const val ICON_SQUARE = "square"
+        const val AI_PROVIDER_OPENAI = "openai"
+        const val AI_PROVIDER_ANTHROPIC = "anthropic"
+        const val AI_PROVIDER_GEMINI = "gemini"
 
         val Default = SmartIslandSettings()
 
@@ -230,6 +267,14 @@ data class SmartIslandSettings(
         const val MAX_SHADOW_ELEVATION = 32f
         const val MIN_ANIMATION_SPEED = 0.6f
         const val MAX_ANIMATION_SPEED = 1.6f
+        const val MIN_ANIMATION_DURATION_MS = 120
+        const val MAX_ANIMATION_DURATION_MS = 700
+        const val MIN_FONT_SCALE = 0.85f
+        const val MAX_FONT_SCALE = 1.25f
+        const val MIN_EXPANDED_WIDTH_SCALE = 0.72f
+        const val MAX_EXPANDED_WIDTH_SCALE = 1f
+        const val MIN_EXPANDED_CORNER_RADIUS = 16f
+        const val MAX_EXPANDED_CORNER_RADIUS = 48f
         const val MIN_PET_SIZE = 32f
         const val MAX_PET_SIZE = 128f
         const val MIN_PET_X = 0f
@@ -368,7 +413,27 @@ data class SmartIslandSettings(
                 animationStyle = obj.optString("animationStyle", defaults.animationStyle).let {
                     if (it in setOf(ANIMATION_STYLE_GENTLE, ANIMATION_STYLE_SPRING, ANIMATION_STYLE_BOUNCY)) it else defaults.animationStyle
                 },
-                animationSpeed = safeFloat("animationSpeed", defaults.animationSpeed, MIN_ANIMATION_SPEED, MAX_ANIMATION_SPEED)
+                animationSpeed = safeFloat("animationSpeed", defaults.animationSpeed, MIN_ANIMATION_SPEED, MAX_ANIMATION_SPEED),
+                animationDurationMs = obj.optInt("animationDurationMs", defaults.animationDurationMs).coerceIn(MIN_ANIMATION_DURATION_MS, MAX_ANIMATION_DURATION_MS),
+                appearancePreset = obj.optString("appearancePreset", defaults.appearancePreset).takeIf {
+                    it in setOf(THEME_MATERIAL_YOU, THEME_ONE_UI, THEME_IOS, THEME_CAVE)
+                } ?: defaults.appearancePreset,
+                dynamicColorsEnabled = obj.optBoolean("dynamicColorsEnabled", defaults.dynamicColorsEnabled),
+                useCustomAccentColor = obj.optBoolean("useCustomAccentColor", defaults.useCustomAccentColor),
+                appAccentColor = safeColor("appAccentColor", defaults.appAccentColor),
+                fontStyle = obj.optString("fontStyle", defaults.fontStyle).takeIf {
+                    it in setOf(FONT_SYSTEM, FONT_SERIF, FONT_MONO)
+                } ?: defaults.fontStyle,
+                fontScale = safeFloat("fontScale", defaults.fontScale, MIN_FONT_SCALE, MAX_FONT_SCALE),
+                iconShape = obj.optString("iconShape", defaults.iconShape).takeIf {
+                    it in setOf(ICON_ROUNDED, ICON_CIRCLE, ICON_SQUARE)
+                } ?: defaults.iconShape,
+                expandedWidthScale = safeFloat("expandedWidthScale", defaults.expandedWidthScale, MIN_EXPANDED_WIDTH_SCALE, MAX_EXPANDED_WIDTH_SCALE),
+                expandedCornerRadius = safeFloat("expandedCornerRadius", defaults.expandedCornerRadius, MIN_EXPANDED_CORNER_RADIUS, MAX_EXPANDED_CORNER_RADIUS),
+                aiProvider = obj.optString("aiProvider", defaults.aiProvider).takeIf {
+                    it in setOf(AI_PROVIDER_OPENAI, AI_PROVIDER_ANTHROPIC, AI_PROVIDER_GEMINI)
+                } ?: defaults.aiProvider,
+                aiModel = obj.optString("aiModel", defaults.aiModel).trim().take(100).ifBlank { defaults.aiModel }
             )
         }
     }

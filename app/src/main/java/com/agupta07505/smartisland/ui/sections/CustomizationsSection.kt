@@ -115,7 +115,6 @@ fun CustomizationsSection(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var localOpacity by remember(settings.opacity) { mutableFloatStateOf(settings.opacity) }
-    var localAnimationSpeed by remember(settings.animationSpeed) { mutableFloatStateOf(settings.animationSpeed) }
     var showDialog by remember { mutableStateOf(false) }
     var currentColorTarget by remember { mutableStateOf("") }
     var colorPickerTitle by remember { mutableStateOf("") }
@@ -265,62 +264,6 @@ fun CustomizationsSection(
                         }
                     )
                 }
-            }
-        }
-
-        // Material You motion controls for expansion, mode changes and dismissals.
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.motion_card_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = stringResource(R.string.motion_card_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = stringResource(R.string.motion_style_label),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(
-                        SmartIslandSettings.ANIMATION_STYLE_GENTLE to R.string.motion_style_gentle,
-                        SmartIslandSettings.ANIMATION_STYLE_SPRING to R.string.motion_style_spring,
-                        SmartIslandSettings.ANIMATION_STYLE_BOUNCY to R.string.motion_style_bouncy
-                    ).forEach { (style, label) ->
-                        FilterChip(
-                            selected = settings.animationStyle == style,
-                            onClick = { scope.launch { repository.setAnimationStyle(style) } },
-                            label = { Text(stringResource(label)) }
-                        )
-                    }
-                }
-                SliderSettingItem(
-                    label = stringResource(R.string.motion_speed_label),
-                    value = localAnimationSpeed * 100f,
-                    range = SmartIslandSettings.MIN_ANIMATION_SPEED * 100f..SmartIslandSettings.MAX_ANIMATION_SPEED * 100f,
-                    suffix = "%",
-                    step = 10f,
-                    onValueChange = { localAnimationSpeed = (it / 100f).coerceIn(
-                        SmartIslandSettings.MIN_ANIMATION_SPEED,
-                        SmartIslandSettings.MAX_ANIMATION_SPEED
-                    ) },
-                    onValueChangeFinished = { scope.launch { repository.setAnimationSpeed(localAnimationSpeed) } }
-                )
             }
         }
 

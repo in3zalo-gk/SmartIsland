@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.sp
 import com.agupta07505.smartisland.model.IslandMode
 import com.agupta07505.smartisland.model.IslandNotification
 import com.agupta07505.smartisland.data.SmartIslandSettings
+import com.agupta07505.smartisland.ui.LocalSmartIslandIconShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import java.text.SimpleDateFormat
@@ -435,6 +436,7 @@ internal fun BatteryCollapsedGlyph(notification: IslandNotification?, settings: 
 
 @Composable
 internal fun NotificationGlyph(notification: IslandNotification?, settings: SmartIslandSettings = SmartIslandSettings.Default) {
+    val appIconFrame = LocalSmartIslandIconShape.current
     val largeIcon = notification?.largeIcon
     val icon = notification?.icon
     val mainIcon = largeIcon ?: icon
@@ -445,7 +447,7 @@ internal fun NotificationGlyph(notification: IslandNotification?, settings: Smar
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(CircleShape)
+                    .clip(appIconFrame)
             )
             if (largeIcon != null && icon != null) {
                 Box(

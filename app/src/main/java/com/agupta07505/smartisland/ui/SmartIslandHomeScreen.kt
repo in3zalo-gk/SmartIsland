@@ -133,6 +133,12 @@ import com.agupta07505.smartisland.data.SmartIslandSettingsRepository
 import com.agupta07505.smartisland.di.SmartIslandRepositories
 import com.agupta07505.smartisland.model.IslandMode
 import com.agupta07505.smartisland.ui.sections.AboutSection
+import com.agupta07505.smartisland.ui.sections.AiStudioSection
+import com.agupta07505.smartisland.ui.sections.AnimationStudioSection
+import com.agupta07505.smartisland.ui.sections.AppearanceStudioSection
+import com.agupta07505.smartisland.ui.sections.IslandStudioSection
+import com.agupta07505.smartisland.ui.sections.StarterExamplesSection
+import com.agupta07505.smartisland.data.ai.AiProvider
 import com.agupta07505.smartisland.ui.sections.AppShortcutsSection
 import com.agupta07505.smartisland.ui.sections.BackupRestoreSection
 import com.agupta07505.smartisland.ui.sections.CustomizationsSection
@@ -150,9 +156,7 @@ import com.agupta07505.smartisland.util.runCatchingLogged
 import kotlinx.coroutines.launch
 
 private enum class StudioTab {
-    Studio,
-    Position,
-    Settings
+    Home, Island, Theme, Motion, AI, More
 }
 
 private enum class FeatureDetailSection {
@@ -237,7 +241,7 @@ fun SmartIslandHomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    var selectedTab by remember { mutableStateOf(StudioTab.Studio) }
+    var selectedTab by remember { mutableStateOf(StudioTab.Home) }
     var activeDetailSection by remember { mutableStateOf<FeatureDetailSection?>(null) }
     var transitionDirection by remember { mutableStateOf(1) } // 1 = forward, -1 = backward
 
@@ -310,15 +314,12 @@ fun SmartIslandHomeScreen(
                     )
 
                     when (selectedTab) {
-                        StudioTab.Studio -> {
-                            // 1. Master Power Switch Card
+                        StudioTab.Home -> {
                             MasterPowerCard(
                                 enabled = settings.enabled,
                                 canEnable = canEnable,
                                 onCheckedChange = { turnOn ->
-                                    if (turnOn) {
-                                        SystemServiceRecovery.requestRecovery(context)
-                                    }
+                                    if (turnOn) SystemServiceRecovery.requestRecovery(context)
                                     scope.launch { resolvedRepository.setEnabled(turnOn) }
                                 },
                                 onSetupPermissionsClick = {
@@ -326,8 +327,6 @@ fun SmartIslandHomeScreen(
                                     activeDetailSection = FeatureDetailSection.PermissionsCenter
                                 }
                             )
-
-                            // 2. Interactive Simulation Lab
                             SimulationLabCard(
                                 activeMode = previewMode,
                                 onModeSelect = { mode ->
@@ -339,32 +338,27 @@ fun SmartIslandHomeScreen(
                                     Toast.makeText(context, context.getString(R.string.toast_cleared_test_notifications), Toast.LENGTH_SHORT).show()
                                 }
                             )
-
+                            StarterExamplesSection()
                         }
-
-                        StudioTab.Position -> {
-                            PositionsSection(
-                                settings = settings,
-                                repository = resolvedRepository,
-                                onNavigateToBackup = {
-                                    transitionDirection = 1
-                                    activeDetailSection = FeatureDetailSection.BackupRestore
-                                }
-                            )
-                        }
-
-                        StudioTab.Settings -> {
-                            SettingsOverviewSection(
-                                settings = settings,
-                                overlayGranted = overlayGranted,
-                                notificationGranted = notificationGranted,
-                                batteryIgnored = batteryIgnored,
-                                onNavigateTo = { section ->
-                                    transitionDirection = 1
-                                    activeDetailSection = section
-                                }
-                            )
-                        }
+                        StudioTab.Island -> IslandStudioSection(settings, resolvedRepository)
+                        StudioTab.Theme -> AppearanceStudioSection(settings, resolvedRepository)
+                        StudioTab.Motion -> AnimationStudioSection(settings, resolvedRepository)
+                        StudioTab.AI -> AiStudioSection(
+                            settings = settings,
+                            onProviderChange = { provider -> scope.launch { resolvedRepository.setAiProvider(provider.id); resolvedRepository.setAiModel(provider.defaultModel) } },
+                            onModelChange = { model -> scope.launch { resolvedRepository.setAiModel(model) } },
+                            context = context
+                        )
+                        StudioTab.More -> SettingsOverviewSection(
+                            settings = settings,
+                            overlayGranted = overlayGranted,
+                            notificationGranted = notificationGranted,
+                            batteryIgnored = batteryIgnored,
+                            onNavigateTo = { section ->
+                                transitionDirection = 1
+                                activeDetailSection = section
+                            }
+                        )
                     }
 
                     Spacer(Modifier.height(8.dp))
@@ -968,43 +962,28 @@ private fun StudioBottomNavigationBar(
     selectedTab: StudioTab,
     onTabSelected: (StudioTab) -> Unit
 ) {
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp
-    ) {
-        NavigationBarItem(
-            selected = selectedTab == StudioTab.Studio,
-            onClick = { onTabSelected(StudioTab.Studio) },
-            icon = { Icon(Icons.Rounded.FlashOn, contentDescription = stringResource(R.string.tab_studio)) },
-            label = { Text(stringResource(R.string.tab_studio), fontWeight = FontWeight.SemiBold) },
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                selectedIconColor = MaterialTheme.colorScheme.primary,
-                selectedTextColor = MaterialTheme.colorScheme.primary
+    val tabs = listOf(
+        Triple(StudioTab.Home, Icons.Rounded.FlashOn, R.string.tab_studio),
+        Triple(StudioTab.Island, Icons.Rounded.Apps, R.string.tab_island),
+        Triple(StudioTab.Theme, Icons.Rounded.Palette, R.string.tab_theme),
+        Triple(StudioTab.Motion, Icons.Rounded.Gesture, R.string.tab_motion),
+        Triple(StudioTab.AI, Icons.Rounded.Explore, R.string.tab_ai),
+        Triple(StudioTab.More, Icons.Rounded.Settings, R.string.tab_more)
+    )
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 6.dp) {
+        tabs.forEach { (tab, icon, label) ->
+            NavigationBarItem(
+                selected = selectedTab == tab,
+                onClick = { onTabSelected(tab) },
+                icon = { Icon(icon, contentDescription = stringResource(label)) },
+                label = { Text(stringResource(label), fontWeight = FontWeight.SemiBold, maxLines = 1) },
+                colors = NavigationBarItemDefaults.colors(
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary
+                )
             )
-        )
-        NavigationBarItem(
-            selected = selectedTab == StudioTab.Position,
-            onClick = { onTabSelected(StudioTab.Position) },
-            icon = { Icon(Icons.Rounded.Tune, contentDescription = stringResource(R.string.tab_position)) },
-            label = { Text(stringResource(R.string.tab_position), fontWeight = FontWeight.SemiBold) },
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                selectedIconColor = MaterialTheme.colorScheme.primary,
-                selectedTextColor = MaterialTheme.colorScheme.primary
-            )
-        )
-        NavigationBarItem(
-            selected = selectedTab == StudioTab.Settings,
-            onClick = { onTabSelected(StudioTab.Settings) },
-            icon = { Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.tab_settings)) },
-            label = { Text(stringResource(R.string.tab_settings), fontWeight = FontWeight.SemiBold) },
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                selectedIconColor = MaterialTheme.colorScheme.primary,
-                selectedTextColor = MaterialTheme.colorScheme.primary
-            )
-        )
+        }
     }
 }
 

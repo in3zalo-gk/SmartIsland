@@ -141,7 +141,7 @@ fun IslandOverlayView(
         isLandscape = isLandscape,
         screenWidthDp = configuration.screenWidthDp.toFloat(),
         screenHeightDp = configuration.screenHeightDp.toFloat()
-    ).dp
+    ).dp * settings.expandedWidthScale
     val transition = updateTransition(targetState = expanded, label = "islandTransition")
 
     val motionSpeed = settings.animationSpeed.coerceIn(
@@ -158,7 +158,8 @@ fun IslandOverlayView(
         SmartIslandSettings.ANIMATION_STYLE_SPRING -> 500f
         else -> 340f
     }
-    val motionStiffness = (baseStiffness * motionSpeed * motionSpeed).coerceIn(120f, 1200f)
+    val durationFactor = (280f / settings.animationDurationMs.coerceIn(SmartIslandSettings.MIN_ANIMATION_DURATION_MS, SmartIslandSettings.MAX_ANIMATION_DURATION_MS)).let { it * it }
+    val motionStiffness = (baseStiffness * motionSpeed * motionSpeed * durationFactor).coerceIn(120f, 1200f)
     val sizeSpec = spring<androidx.compose.ui.unit.Dp>(
         dampingRatio = motionDamping,
         stiffness = motionStiffness
@@ -267,10 +268,12 @@ fun IslandOverlayView(
         if (it) expandedTopOffset else 0.dp
     }
     val radius by transition.animateDp(transitionSpec = { sizeSpec }, label = "islandRadius") {
-        if (it) 34.dp else if (isHiding) 0.dp else settings.cornerRadius.dp
+        if (it) settings.expandedCornerRadius.dp else if (isHiding) 0.dp else settings.cornerRadius.dp
     }
+    val screenCollapsedMainOffset = mainCenter - screenCenter
+    val windowOriginOffset = if (!isFullWidth && !currentExpanded) groupCenter - screenCenter else 0.dp
     val animatedXOffset by transition.animateDp(transitionSpec = { sizeSpec }, label = "islandXOffset") {
-        if (it) 0.dp else collapsedMainOffset
+        if (it) 0.dp else screenCollapsedMainOffset
     }
 
     val collapsedAlpha by transition.animateFloat(
@@ -390,15 +393,11 @@ fun IslandOverlayView(
     )
 
     val expandedCompactX = collapsedMainLeft
-    val collapsedSecondaryOffset = if (isFullWidth) {
-        circleCenter - screenCenter
-    } else {
-        circleCenter - groupCenter
-    }
+    val collapsedSecondaryOffset = circleCenter - screenCenter
     val secondaryExpandedOffset = calculateSecondaryExpandedOffset(
         secondaryIsPill = secondaryIsPill,
         isCircleLeft = isCircleLeft,
-        isFullWidth = isFullWidth,
+        isFullWidth = true,
         expandedCompactX = expandedCompactX.value,
         screenCenter = screenCenter.value,
         miniPillWidth = miniPillWidth.value,
@@ -473,7 +472,7 @@ fun IslandOverlayView(
                 .width(safeWidth)
                 .height(safeHeight)
                 .graphicsLayer {
-                    translationX = animatedXOffset.toPx() +
+                    translationX = (animatedXOffset - windowOriginOffset).toPx() +
                         (if (!currentExpanded) pillDragOffsetX else dismissSwipeOffset)
                     translationY = yOffset.toPx() + dragOffset
                     scaleX = switchScaleAnim.value
@@ -913,7 +912,7 @@ fun IslandOverlayView(
                 modifier = Modifier
                     .absoluteOffset {
                         IntOffset(
-                            secondaryOffset.roundToPx(),
+                            (secondaryOffset - windowOriginOffset).roundToPx(),
                             0
                         )
                     }

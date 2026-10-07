@@ -36,6 +36,22 @@ private val Context.smartIslandDataStore by preferencesDataStore(
 )
 
 class SmartIslandSettingsRepository(private val context: Context) {
+    private companion object {
+        val VALID_APPEARANCE_PRESETS = setOf(
+            SmartIslandSettings.THEME_MATERIAL_YOU, SmartIslandSettings.THEME_ONE_UI,
+            SmartIslandSettings.THEME_IOS, SmartIslandSettings.THEME_CAVE
+        )
+        val VALID_FONT_STYLES = setOf(
+            SmartIslandSettings.FONT_SYSTEM, SmartIslandSettings.FONT_SERIF, SmartIslandSettings.FONT_MONO
+        )
+        val VALID_ICON_SHAPES = setOf(
+            SmartIslandSettings.ICON_ROUNDED, SmartIslandSettings.ICON_CIRCLE, SmartIslandSettings.ICON_SQUARE
+        )
+        val VALID_AI_PROVIDERS = setOf(
+            SmartIslandSettings.AI_PROVIDER_OPENAI, SmartIslandSettings.AI_PROVIDER_ANTHROPIC, SmartIslandSettings.AI_PROVIDER_GEMINI
+        )
+    }
+
     private object Keys {
         val Enabled = booleanPreferencesKey("enabled")
         val Width = floatPreferencesKey("width")
@@ -114,6 +130,18 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val PetNightModeEndHour = intPreferencesKey("pet_night_mode_end_hour")
         val AnimationStyle = stringPreferencesKey("animation_style")
         val AnimationSpeed = floatPreferencesKey("animation_speed")
+        val AnimationDurationMs = intPreferencesKey("animation_duration_ms")
+        val AppearancePreset = stringPreferencesKey("appearance_preset")
+        val DynamicColorsEnabled = booleanPreferencesKey("dynamic_colors_enabled")
+        val UseCustomAccentColor = booleanPreferencesKey("use_custom_accent_color")
+        val AppAccentColor = longPreferencesKey("app_accent_color")
+        val FontStyle = stringPreferencesKey("font_style")
+        val FontScale = floatPreferencesKey("font_scale")
+        val IconShape = stringPreferencesKey("icon_shape")
+        val ExpandedWidthScale = floatPreferencesKey("expanded_width_scale")
+        val ExpandedCornerRadius = floatPreferencesKey("expanded_corner_radius")
+        val AiProvider = stringPreferencesKey("ai_provider")
+        val AiModel = stringPreferencesKey("ai_model")
     }
 
     val settings: Flow<SmartIslandSettings> = context.smartIslandDataStore.data
@@ -267,7 +295,21 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 animationSpeed = validDimension(
                     prefs[Keys.AnimationSpeed], defaults.animationSpeed,
                     SmartIslandSettings.MIN_ANIMATION_SPEED, SmartIslandSettings.MAX_ANIMATION_SPEED
-                )
+                ),
+                animationDurationMs = (prefs[Keys.AnimationDurationMs] ?: defaults.animationDurationMs).coerceIn(
+                    SmartIslandSettings.MIN_ANIMATION_DURATION_MS, SmartIslandSettings.MAX_ANIMATION_DURATION_MS
+                ),
+                appearancePreset = prefs[Keys.AppearancePreset]?.takeIf { it in VALID_APPEARANCE_PRESETS } ?: defaults.appearancePreset,
+                dynamicColorsEnabled = prefs[Keys.DynamicColorsEnabled] ?: defaults.dynamicColorsEnabled,
+                useCustomAccentColor = prefs[Keys.UseCustomAccentColor] ?: defaults.useCustomAccentColor,
+                appAccentColor = validColor(prefs[Keys.AppAccentColor], defaults.appAccentColor),
+                fontStyle = prefs[Keys.FontStyle]?.takeIf { it in VALID_FONT_STYLES } ?: defaults.fontStyle,
+                fontScale = validDimension(prefs[Keys.FontScale], defaults.fontScale, SmartIslandSettings.MIN_FONT_SCALE, SmartIslandSettings.MAX_FONT_SCALE),
+                iconShape = prefs[Keys.IconShape]?.takeIf { it in VALID_ICON_SHAPES } ?: defaults.iconShape,
+                expandedWidthScale = validDimension(prefs[Keys.ExpandedWidthScale], defaults.expandedWidthScale, SmartIslandSettings.MIN_EXPANDED_WIDTH_SCALE, SmartIslandSettings.MAX_EXPANDED_WIDTH_SCALE),
+                expandedCornerRadius = validDimension(prefs[Keys.ExpandedCornerRadius], defaults.expandedCornerRadius, SmartIslandSettings.MIN_EXPANDED_CORNER_RADIUS, SmartIslandSettings.MAX_EXPANDED_CORNER_RADIUS),
+                aiProvider = prefs[Keys.AiProvider]?.takeIf { it in VALID_AI_PROVIDERS } ?: defaults.aiProvider,
+                aiModel = prefs[Keys.AiModel]?.take(100)?.takeIf { it.isNotBlank() } ?: defaults.aiModel
             )
         }
 
@@ -561,6 +603,38 @@ class SmartIslandSettingsRepository(private val context: Context) {
             SmartIslandSettings.MIN_ANIMATION_SPEED, SmartIslandSettings.MAX_ANIMATION_SPEED
         )
     }
+    suspend fun setAnimationDurationMs(value: Int) = editSafely {
+        it[Keys.AnimationDurationMs] = value.coerceIn(
+            SmartIslandSettings.MIN_ANIMATION_DURATION_MS, SmartIslandSettings.MAX_ANIMATION_DURATION_MS
+        )
+    }
+    suspend fun setAppearancePreset(value: String) = editSafely {
+        it[Keys.AppearancePreset] = value.takeIf { it in VALID_APPEARANCE_PRESETS } ?: SmartIslandSettings.THEME_MATERIAL_YOU
+    }
+    suspend fun setDynamicColorsEnabled(value: Boolean) = editSafely { it[Keys.DynamicColorsEnabled] = value }
+    suspend fun setUseCustomAccentColor(value: Boolean) = editSafely { it[Keys.UseCustomAccentColor] = value }
+    suspend fun setAppAccentColor(value: Long) = editSafely {
+        it[Keys.AppAccentColor] = validColor(value, SmartIslandSettings.Default.appAccentColor)
+    }
+    suspend fun setFontStyle(value: String) = editSafely {
+        it[Keys.FontStyle] = value.takeIf { it in VALID_FONT_STYLES } ?: SmartIslandSettings.FONT_SYSTEM
+    }
+    suspend fun setFontScale(value: Float) = editSafely {
+        it[Keys.FontScale] = validDimension(value, SmartIslandSettings.Default.fontScale, SmartIslandSettings.MIN_FONT_SCALE, SmartIslandSettings.MAX_FONT_SCALE)
+    }
+    suspend fun setIconShape(value: String) = editSafely {
+        it[Keys.IconShape] = value.takeIf { it in VALID_ICON_SHAPES } ?: SmartIslandSettings.ICON_ROUNDED
+    }
+    suspend fun setExpandedWidthScale(value: Float) = editSafely {
+        it[Keys.ExpandedWidthScale] = validDimension(value, SmartIslandSettings.Default.expandedWidthScale, SmartIslandSettings.MIN_EXPANDED_WIDTH_SCALE, SmartIslandSettings.MAX_EXPANDED_WIDTH_SCALE)
+    }
+    suspend fun setExpandedCornerRadius(value: Float) = editSafely {
+        it[Keys.ExpandedCornerRadius] = validDimension(value, SmartIslandSettings.Default.expandedCornerRadius, SmartIslandSettings.MIN_EXPANDED_CORNER_RADIUS, SmartIslandSettings.MAX_EXPANDED_CORNER_RADIUS)
+    }
+    suspend fun setAiProvider(value: String) = editSafely {
+        it[Keys.AiProvider] = value.takeIf { it in VALID_AI_PROVIDERS } ?: SmartIslandSettings.AI_PROVIDER_OPENAI
+    }
+    suspend fun setAiModel(value: String) = editSafely { it[Keys.AiModel] = value.trim().take(100).ifBlank { SmartIslandSettings.Default.aiModel } }
     suspend fun toggleNotificationCooldownExcludedPackage(packageName: String) = editSafely { prefs ->
         val current = prefs[Keys.NotificationCooldownExcludedPackages] ?: emptySet()
         prefs[Keys.NotificationCooldownExcludedPackages] = if (packageName in current) {
@@ -716,6 +790,18 @@ class SmartIslandSettingsRepository(private val context: Context) {
             settings.animationSpeed, SmartIslandSettings.Default.animationSpeed,
             SmartIslandSettings.MIN_ANIMATION_SPEED, SmartIslandSettings.MAX_ANIMATION_SPEED
         )
+        prefs[Keys.AnimationDurationMs] = settings.animationDurationMs.coerceIn(SmartIslandSettings.MIN_ANIMATION_DURATION_MS, SmartIslandSettings.MAX_ANIMATION_DURATION_MS)
+        prefs[Keys.AppearancePreset] = settings.appearancePreset.takeIf { it in VALID_APPEARANCE_PRESETS } ?: SmartIslandSettings.THEME_MATERIAL_YOU
+        prefs[Keys.DynamicColorsEnabled] = settings.dynamicColorsEnabled
+        prefs[Keys.UseCustomAccentColor] = settings.useCustomAccentColor
+        prefs[Keys.AppAccentColor] = validColor(settings.appAccentColor, SmartIslandSettings.Default.appAccentColor)
+        prefs[Keys.FontStyle] = settings.fontStyle.takeIf { it in VALID_FONT_STYLES } ?: SmartIslandSettings.FONT_SYSTEM
+        prefs[Keys.FontScale] = validDimension(settings.fontScale, SmartIslandSettings.Default.fontScale, SmartIslandSettings.MIN_FONT_SCALE, SmartIslandSettings.MAX_FONT_SCALE)
+        prefs[Keys.IconShape] = settings.iconShape.takeIf { it in VALID_ICON_SHAPES } ?: SmartIslandSettings.ICON_ROUNDED
+        prefs[Keys.ExpandedWidthScale] = validDimension(settings.expandedWidthScale, SmartIslandSettings.Default.expandedWidthScale, SmartIslandSettings.MIN_EXPANDED_WIDTH_SCALE, SmartIslandSettings.MAX_EXPANDED_WIDTH_SCALE)
+        prefs[Keys.ExpandedCornerRadius] = validDimension(settings.expandedCornerRadius, SmartIslandSettings.Default.expandedCornerRadius, SmartIslandSettings.MIN_EXPANDED_CORNER_RADIUS, SmartIslandSettings.MAX_EXPANDED_CORNER_RADIUS)
+        prefs[Keys.AiProvider] = settings.aiProvider.takeIf { it in VALID_AI_PROVIDERS } ?: SmartIslandSettings.AI_PROVIDER_OPENAI
+        prefs[Keys.AiModel] = settings.aiModel.trim().take(100).ifBlank { SmartIslandSettings.Default.aiModel }
     }
 
     suspend fun resetAllSettings() = restoreSettings(SmartIslandSettings.Default.copy(welcomeDialogShown = true))
