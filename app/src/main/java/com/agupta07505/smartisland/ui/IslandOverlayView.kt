@@ -128,7 +128,7 @@ fun IslandOverlayView(
     val scope = rememberCoroutineScope()
     var dragOffset by remember { mutableStateOf(0f) }
     var pillDragOffsetX by remember { mutableStateOf(0f) }
-    val dismissSwipeAnim = remember { Animatable(0f) }
+    var dismissSwipeOffset by remember { mutableStateOf(0f) }
 
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -240,7 +240,7 @@ fun IslandOverlayView(
     LaunchedEffect(notifications.map { it.key }, selectedIndex) {
         isAutoHidden = false
         userInteractionTimestamp = System.currentTimeMillis()
-        if (dismissSwipeAnim.value != 0f) dismissSwipeAnim.snapTo(0f)
+        dismissSwipeOffset = 0f
     }
 
     // Auto-hide countdown timer when pill is collapsed and autoHidePill is enabled
@@ -474,7 +474,7 @@ fun IslandOverlayView(
                 .height(safeHeight)
                 .graphicsLayer {
                     translationX = animatedXOffset.toPx() +
-                        (if (!currentExpanded) pillDragOffsetX else dismissSwipeAnim.value)
+                        (if (!currentExpanded) pillDragOffsetX else dismissSwipeOffset)
                     translationY = yOffset.toPx() + dragOffset
                     scaleX = switchScaleAnim.value
                     scaleY = switchScaleAnim.value
@@ -505,7 +505,7 @@ fun IslandOverlayView(
                         val pressTimeMs = System.currentTimeMillis()
                         val wasExpandedAtStart = currentExpanded
                         val notificationAtGestureStart = currentNotifications.getOrNull(currentSelectedIndex)
-                        if (wasExpandedAtStart && dismissSwipeAnim.value != 0f) dismissSwipeAnim.snapTo(0f)
+                        if (wasExpandedAtStart) dismissSwipeOffset = 0f
                         var isHoldRegistered = false
                         var dragAccumulatorY = 0f
                         var dragAccumulatorX = 0f
@@ -541,15 +541,17 @@ fun IslandOverlayView(
                                         horizontalDominant && abs(dragAccumulatorX) >= sideDismissThreshold
                                     ) {
                                         val exitX = if (dragAccumulatorX < 0f) -displayMetrics.widthPixels.toFloat() else displayMetrics.widthPixels.toFloat()
-                                        dismissSwipeAnim.animateTo(
-                                            targetValue = exitX,
-                                            animationSpec = tween(
-                                                durationMillis = (170f / motionSpeed).toInt().coerceIn(100, 300),
-                                                easing = FastOutSlowInEasing
-                                            )
-                                        )
-                                        currentOnDismissByKey(notificationAtGestureStart.key)
                                         dismissedBySideSwipe = true
+                                        scope.launch {
+                                            Animatable(dismissSwipeOffset).animateTo(
+                                                targetValue = exitX,
+                                                animationSpec = tween(
+                                                    durationMillis = (170f / motionSpeed).toInt().coerceIn(100, 300),
+                                                    easing = FastOutSlowInEasing
+                                                )
+                                            ) { dismissSwipeOffset = value }
+                                            currentOnDismissByKey(notificationAtGestureStart.key)
+                                        }
                                     } else if (isDragging && currentSettings.enableSwipeActions && dragOffset < swipeUpThreshold) {
                                         val isHold = isHoldRegistered || totalElapsedMs >= HOLD_GESTURE_THRESHOLD_MS
                                         val actionStr = if (isHold) currentSettings.swipeHoldUpAction else currentSettings.swipeUpAction
@@ -700,10 +702,10 @@ fun IslandOverlayView(
                                     if (wasExpandedAtStart) {
                                         if (abs(dragAccumulatorX) > abs(dragAccumulatorY)) {
                                             val maxDismissDrag = displayMetrics.widthPixels * 0.45f
-                                            dismissSwipeAnim.snapTo(dragAccumulatorX.coerceIn(-maxDismissDrag, maxDismissDrag))
+                                            dismissSwipeOffset = dragAccumulatorX.coerceIn(-maxDismissDrag, maxDismissDrag)
                                             dragOffset = 0f
                                         } else {
-                                            if (dismissSwipeAnim.value != 0f) dismissSwipeAnim.snapTo(0f)
+                                            dismissSwipeOffset = 0f
                                             dragOffset = dragAccumulatorY.coerceIn(
                                                 -DRAG_MAX_OFFSET_DP * displayMetrics.density,
                                                 DRAG_MAX_OFFSET_DP * displayMetrics.density
@@ -821,15 +823,16 @@ fun IslandOverlayView(
                                 }
                             }
                         }
-                        if (dismissSwipeAnim.value != 0f && !dismissedBySideSwipe) {
+                        if (dismissSwipeOffset != 0f && !dismissedBySideSwipe) {
+                            val swipeStart = dismissSwipeOffset
                             scope.launch {
-                                dismissSwipeAnim.animateTo(
+                                Animatable(swipeStart).animateTo(
                                     targetValue = 0f,
                                     animationSpec = spring(
                                         dampingRatio = motionDamping,
                                         stiffness = motionStiffness
                                     )
-                                )
+                                ) { dismissSwipeOffset = value }
                             }
                         }
                         if (dragOffset != 0f) {
