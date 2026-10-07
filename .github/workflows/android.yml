@@ -54,7 +54,22 @@ jobs:
       - name: Run lint, tests, and debug build
         run: |
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            ./gradlew --no-daemon --stacktrace clean assembleDebug
+            ./gradlew --no-daemon clean
+            set +e
+            ./gradlew --no-daemon --rerun-tasks --no-build-cache --stacktrace --info kaptDebugKotlin
+            KAPT_STATUS=$?
+            set -e
+            echo "--- KAPT classes with the affected name ---"
+            find app/build/tmp/kapt3 -type f -iname '*SmartIslandSettings*' -print 2>/dev/null || true
+            echo "--- Stub declarations ---"
+            grep -R -nE 'class SmartIslandSettings|interface SmartIslandSettings|typealias SmartIslandSettings' app/build/tmp/kapt3/stubs/debug app/build/generated 2>/dev/null || true
+            echo "--- Matching stub paths ---"
+            find app/build/tmp/kapt3/stubs/debug -type f -name '*.java' -print 2>/dev/null | sort | grep -i 'SmartIslandSettings' || true
+            if [[ "$KAPT_STATUS" -ne 0 ]]; then
+              echo "KAPT diagnostic failed with status $KAPT_STATUS" >&2
+              exit "$KAPT_STATUS"
+            fi
+            ./gradlew --no-daemon --no-build-cache assembleDebug
           else
             ./gradlew --no-daemon --stacktrace lintDebug testDebugUnitTest assembleDebug
           fi
