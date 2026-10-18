@@ -104,6 +104,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val PillSwipeLeftAction = stringPreferencesKey("pill_swipe_left_action")
         val PillSwipeRightAction = stringPreferencesKey("pill_swipe_right_action")
         val CirclePosition = stringPreferencesKey("circle_position")
+        val EnablePet = booleanPreferencesKey("enable_pet")
+        val PetColor = longPreferencesKey("pet_color")
+        val PetInsideIsland = booleanPreferencesKey("pet_inside_island")
     }
 
     val settings: Flow<SmartIslandSettings> = context.smartIslandDataStore.data
@@ -244,7 +247,10 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 pillSwipeDownAction = prefs[Keys.PillSwipeDownAction] ?: defaults.pillSwipeDownAction,
                 pillSwipeLeftAction = prefs[Keys.PillSwipeLeftAction] ?: defaults.pillSwipeLeftAction,
                 pillSwipeRightAction = prefs[Keys.PillSwipeRightAction] ?: defaults.pillSwipeRightAction,
-                circlePosition = prefs[Keys.CirclePosition]?.takeIf { it in VALID_CIRCLE_POSITIONS } ?: defaults.circlePosition
+                circlePosition = prefs[Keys.CirclePosition]?.takeIf { it in VALID_CIRCLE_POSITIONS } ?: defaults.circlePosition,
+                enablePet = prefs[Keys.EnablePet] ?: defaults.enablePet,
+                petColor = validColor(prefs[Keys.PetColor], defaults.petColor),
+                petInsideIsland = prefs[Keys.PetInsideIsland] ?: defaults.petInsideIsland
             )
         }
 
@@ -513,6 +519,15 @@ class SmartIslandSettingsRepository(private val context: Context) {
     suspend fun setCirclePosition(value: String) = editSafely {
         it[Keys.CirclePosition] = if (value in VALID_CIRCLE_POSITIONS) value else SmartIslandSettings.CIRCLE_POSITION_RIGHT
     }
+    suspend fun setEnablePet(value: Boolean) = editSafely {
+        it[Keys.EnablePet] = value
+    }
+    suspend fun setPetColor(value: Long) = editSafely {
+        it[Keys.PetColor] = validColor(value, SmartIslandSettings.Default.petColor)
+    }
+    suspend fun setPetInsideIsland(value: Boolean) = editSafely {
+        it[Keys.PetInsideIsland] = value
+    }
     suspend fun toggleNotificationCooldownExcludedPackage(packageName: String) = editSafely { prefs ->
         val current = prefs[Keys.NotificationCooldownExcludedPackages] ?: emptySet()
         prefs[Keys.NotificationCooldownExcludedPackages] = if (packageName in current) {
@@ -651,6 +666,9 @@ class SmartIslandSettingsRepository(private val context: Context) {
         } else {
             SmartIslandSettings.CIRCLE_POSITION_RIGHT
         }
+        prefs[Keys.EnablePet] = settings.enablePet
+        prefs[Keys.PetColor] = validColor(settings.petColor, SmartIslandSettings.Default.petColor)
+        prefs[Keys.PetInsideIsland] = settings.petInsideIsland
     }
 
     suspend fun resetAllSettings() = restoreSettings(SmartIslandSettings.Default.copy(welcomeDialogShown = true))

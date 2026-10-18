@@ -36,6 +36,7 @@ import androidx.core.graphics.drawable.toBitmap
 import com.agupta07505.smartisland.data.INotificationHistoryRepository
 import com.agupta07505.smartisland.data.INotificationRepository
 import com.agupta07505.smartisland.data.NotificationHistoryEntry
+import com.agupta07505.smartisland.data.NotificationStatsRepository
 import com.agupta07505.smartisland.data.SmartIslandCommand
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.data.SmartIslandSettingsRepository
@@ -72,6 +73,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
     @Inject lateinit var repository: SmartIslandSettingsRepository
     @Inject lateinit var notificationRepository: INotificationRepository
     @Inject lateinit var historyRepository: INotificationHistoryRepository
+    @Inject lateinit var statsRepository: NotificationStatsRepository
     private var lastHistoryCleanupTime = 0L
     private val cooldownReleaseJobs = ConcurrentHashMap<String, Job>()
     private var lastSoundPlayedTimeMs = 0L
@@ -278,6 +280,7 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 android.util.Log.d(TAG, "Genuinely removed, cleaning up: ${sbn.key}")
                 clearSuppressed(sbn.key)
                 notificationRepository.removeNotification(sbn.key)
+                statsRepository.recordDismiss()
             }
             pendingRemovals.remove(sbn.key)
         }
@@ -591,6 +594,14 @@ class SmartIslandNotificationListenerService : NotificationListenerService() {
                 false
             }
         )
+
+        if (isNewNotif) {
+            serviceScope.launch {
+                runSuspendCatchingLogged(TAG, "Failed to record notification stats") {
+                    statsRepository.recordNotification(appName, sbn.packageName, mode.name)
+                }
+            }
+        }
 
         if (settings.enableNotificationHistory && mode != IslandMode.Music) {
             serviceScope.launch {

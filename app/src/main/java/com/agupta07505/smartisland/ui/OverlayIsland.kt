@@ -37,6 +37,7 @@ fun OverlayIsland(
     val selectedIndex by viewModel.selectedIndex.collectAsState()
     val isLocked by viewModel.isLocked.collectAsState()
     val isInputActive by viewModel.isInputActive.collectAsState()
+    val petState by viewModel.petState.collectAsState()
     val context = LocalContext.current
 
     val isContentRedacted = isLocked && settings.lockScreenPrivacy == "AppIconOnly"
@@ -108,6 +109,11 @@ fun OverlayIsland(
         isInputActive = isInputActive,
         onReplyStateChanged = { viewModel.setInputActive(it) },
         isFullWidth = isFullWidth,
+        petMood = petState.mood,
+        petColor = settings.petColor,
+        enablePet = settings.enablePet,
+        petInsideIsland = settings.petInsideIsland,
+        onPetTap = { viewModel.setPetMood(com.agupta07505.smartisland.model.PetMood.Tapped) },
         modifier = modifier
     )
 }

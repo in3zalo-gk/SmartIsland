@@ -51,6 +51,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Analytics
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AvTimer
 import androidx.compose.material.icons.rounded.BatteryChargingFull
@@ -72,6 +73,7 @@ import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.People
+import androidx.compose.material.icons.rounded.Pets
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.rounded.Shield
@@ -139,7 +141,9 @@ import com.agupta07505.smartisland.ui.sections.DeveloperOptionsSection
 import com.agupta07505.smartisland.ui.sections.GesturesSection
 import com.agupta07505.smartisland.ui.sections.NotificationHistorySection
 import com.agupta07505.smartisland.ui.sections.NotificationsAndPrivacySection
+import com.agupta07505.smartisland.ui.sections.PetSection
 import com.agupta07505.smartisland.ui.sections.PermissionsSection
+import com.agupta07505.smartisland.ui.sections.StatisticsSection
 import com.agupta07505.smartisland.ui.sections.UpdatesAndDownloadsSection
 import com.agupta07505.smartisland.ui.sections.PositionsSection
 import com.agupta07505.smartisland.ui.sections.SupportSection
@@ -164,7 +168,9 @@ private enum class FeatureDetailSection {
     UpdatesAndDownloads,
     AboutApp,
     SupportCommunity,
-    DeveloperOptions
+    DeveloperOptions,
+    PetSettings,
+    Statistics
 }
 
 @SuppressLint("BatteryLife")
@@ -818,6 +824,14 @@ private fun SettingsOverviewSection(
                 icon = Icons.Rounded.Gesture,
                 onClick = { onNavigateTo(FeatureDetailSection.GesturesGuide) }
             )
+
+            FeatureStudioNavigationCard(
+                title = "Island Pet",
+                icon = Icons.Rounded.Pets,
+                statusText = if (settings.enablePet) "Active" else null,
+                statusColor = if (settings.enablePet) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = { onNavigateTo(FeatureDetailSection.PetSettings) }
+            )
         }
 
         // Section 3: System
@@ -834,6 +848,12 @@ private fun SettingsOverviewSection(
                 title = stringResource(R.string.card_backup_restore_title),
                 icon = Icons.Rounded.SettingsBackupRestore,
                 onClick = { onNavigateTo(FeatureDetailSection.BackupRestore) }
+            )
+
+            FeatureStudioNavigationCard(
+                title = "Statistics & Insights",
+                icon = Icons.Rounded.Analytics,
+                onClick = { onNavigateTo(FeatureDetailSection.Statistics) }
             )
         }
 
@@ -1067,6 +1087,8 @@ private fun DetailScreenHost(
                 FeatureDetailSection.AboutApp -> stringResource(R.string.detail_title_about_app)
                 FeatureDetailSection.SupportCommunity -> stringResource(R.string.detail_title_support_community)
                 FeatureDetailSection.DeveloperOptions -> stringResource(R.string.detail_title_developer_options)
+                FeatureDetailSection.PetSettings -> "Island Pet"
+                FeatureDetailSection.Statistics -> "Statistics & Insights"
             }
             Text(
                 text = title,
@@ -1148,6 +1170,15 @@ private fun DetailScreenHost(
             }
             FeatureDetailSection.DeveloperOptions -> {
                 DeveloperOptionsSection(settings = settings, repository = repository)
+            }
+            FeatureDetailSection.PetSettings -> {
+                PetSection(settings = settings, repository = repository)
+            }
+            FeatureDetailSection.Statistics -> {
+                val statsRepository = remember(context) {
+                    SmartIslandRepositories.statsRepository(context)
+                }
+                StatisticsSection(statsRepository = statsRepository)
             }
         }
     }

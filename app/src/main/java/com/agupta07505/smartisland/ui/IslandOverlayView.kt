@@ -68,6 +68,7 @@ import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.di.SmartIslandRepositories
 import com.agupta07505.smartisland.model.IslandMode
 import com.agupta07505.smartisland.model.IslandNotification
+import com.agupta07505.smartisland.model.PetMood
 import com.agupta07505.smartisland.data.LaunchableApp
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -104,7 +105,12 @@ fun IslandOverlayView(
     isInputActive: Boolean = false,
     onReplyStateChanged: (Boolean) -> Unit = {},
     onDismissAllNotifications: () -> Unit = {},
-    isFullWidth: Boolean = true
+    isFullWidth: Boolean = true,
+    petMood: PetMood = PetMood.Idle,
+    petColor: Long = 0xFFFF7043L,
+    enablePet: Boolean = false,
+    petInsideIsland: Boolean = true,
+    onPetTap: () -> Unit = {}
 ) {
     // Fix #1: rememberUpdatedState ensures the lambda is always fresh
     // even though pointerInput(Unit) never restarts its coroutine
@@ -141,19 +147,19 @@ fun IslandOverlayView(
     val transition = updateTransition(targetState = expanded, label = "islandTransition")
 
     val sizeSpec = spring<androidx.compose.ui.unit.Dp>(
-        dampingRatio = 0.72f,
-        stiffness = 520f
+        dampingRatio = 0.82f,
+        stiffness = 380f
     )
     val sizeSpecFloat = spring<Float>(
-        dampingRatio = 0.72f,
-        stiffness = 520f
+        dampingRatio = 0.82f,
+        stiffness = 380f
     )
     val heightSpec = spring<androidx.compose.ui.unit.Dp>(
-        dampingRatio = 0.76f,
-        stiffness = 520f
+        dampingRatio = 0.85f,
+        stiffness = 380f
     )
     val alphaSpec = tween<Float>(
-        durationMillis = 190,
+        durationMillis = 240,
         easing = FastOutSlowInEasing
     )
 
@@ -333,17 +339,17 @@ fun IslandOverlayView(
 
     val secondaryAlpha by animateFloatAsState(
         targetValue = if (isSplitMode && !isHiding) 1f else 0f,
-        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
         label = "secondaryAlpha"
     )
     val secondaryScale by animateFloatAsState(
         targetValue = if (isSplitMode && !isHiding) 1f else 0.3f,
-        animationSpec = spring(dampingRatio = 0.68f, stiffness = 480f),
+        animationSpec = spring(dampingRatio = 0.78f, stiffness = 380f),
         label = "secondaryScale"
     )
     val secondaryBubbleWidth by animateDpAsState(
         targetValue = if (secondaryIsPill) miniPillWidth else circleSize,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 520f),
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = 380f),
         label = "secondaryBubbleWidth"
     )
     val secondaryPillProgress = (miniPillWidth - circleSize).value.let { widthDelta ->
@@ -355,17 +361,17 @@ fun IslandOverlayView(
     }
     val secondaryBubbleCorner by animateDpAsState(
         targetValue = if (secondaryIsPill) settings.cornerRadius.dp else circleSize / 2f,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 520f),
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = 380f),
         label = "secondaryBubbleCorner"
     )
     val tertiaryAlpha by animateFloatAsState(
         targetValue = if (showTertiaryPill && !isHiding) 1f else 0f,
-        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
         label = "tertiaryAlpha"
     )
     val tertiaryScale by animateFloatAsState(
         targetValue = if (showTertiaryPill && !isHiding) 1f else 0.3f,
-        animationSpec = spring(dampingRatio = 0.68f, stiffness = 480f),
+        animationSpec = spring(dampingRatio = 0.78f, stiffness = 380f),
         label = "tertiaryScale"
     )
 
@@ -387,7 +393,7 @@ fun IslandOverlayView(
     ).dp
     val secondaryOffset by animateDpAsState(
         targetValue = if (!expanded) collapsedSecondaryOffset else secondaryExpandedOffset,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 520f),
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = 380f),
         label = "secondaryOffset"
     )
 
@@ -841,6 +847,22 @@ fun IslandOverlayView(
                         settings = settings,
                         onReplyStateChanged = onReplyStateChanged
                     )
+                }
+
+                // Virtual Pet in the corner of the expanded island
+                if (enablePet && petInsideIsland && expandedAlpha > 0.1f) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(end = 10.dp, top = 6.dp)
+                            .graphicsLayer { alpha = expandedAlpha }
+                    ) {
+                        IslandPetComposable(
+                            mood = petMood,
+                            petColor = petColor,
+                            onTap = onPetTap
+                        )
+                    }
                 }
             }
         }

@@ -44,10 +44,22 @@ object NavigationParser {
         "com.here.app.maps",
         "com.tomtom.gplay.navapp",
         "net.osmand",
+        "net.osmand.plus",
         "ru.yandex.yandexnavi",
         "ru.yandex.yandexmaps",
         "com.locnall.KimGiSa",
-        "com.nhn.android.nmap"
+        "com.nhn.android.nmap",
+        "com.skt.tmap.ku",
+        "com.generalmagic.magicearth",
+        "com.mapfactor.navigator",
+        "app.organicmaps",
+        "com.skobbler.ng2",
+        "com.mapswithme.maps.pro",
+        "com.sygic.aura.free",
+        "com.tomtom.gplay.navapp.free",
+        "com.mio.maps",
+        "com.garmin.android.apps.mobileapps.garminmobile",
+        "com.navigon.navigator"
     )
 
     private val DISTANCE_PATTERN = Pattern.compile("^(\\d+(?:\\.\\d+)?)\\s*(?:m|km|ft|mi|miles?|meters?)\\b", Pattern.CASE_INSENSITIVE)
