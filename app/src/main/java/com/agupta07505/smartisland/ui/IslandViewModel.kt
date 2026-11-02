@@ -18,6 +18,8 @@ import com.agupta07505.smartisland.model.IslandMode
 import com.agupta07505.smartisland.model.IslandNotification
 import com.agupta07505.smartisland.model.IslandPetState
 import com.agupta07505.smartisland.model.PetMood
+import com.agupta07505.smartisland.model.transientDurationMillis
+import com.agupta07505.smartisland.model.afterReaction
 import com.agupta07505.smartisland.util.runSuspendCatchingLogged
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -25,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -75,6 +78,7 @@ class IslandViewModel(
     )
 
     private var autoCollapseJob: Job? = null
+    private var activePetMood = PetMood.Idle
 
     init {
         viewModelScope.launch {
@@ -140,37 +144,41 @@ class IslandViewModel(
         }
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Pet-mood auto-revert failed") {
-                petState.collect { state ->
-                    if (state.shouldRevertToIdle()) {
-                        delay(100L)
-                        if (petState.value.mood == state.mood) {
-                            petState.value = IslandPetState(mood = PetMood.Idle)
-                        }
+                petState.collectLatest { state ->
+                    val duration = state.mood.transientDurationMillis ?: return@collectLatest
+                    delay(duration)
+                    // Never clear a newer reaction with an older timer.
+                    if (petState.value === state) {
+                        petState.value = IslandPetState(mood = activePetMood.afterReaction())
                     }
                 }
             }
         }
         viewModelScope.launch {
             runSuspendCatchingLogged(TAG, "Pet-mode-reaction collector failed") {
-                mode.collect { islandMode ->
-                    if (settings.value.enablePet) {
-                        val petMood = when (islandMode) {
-                            IslandMode.Battery -> {
-                                val title = visibleNotifications.value.getOrNull(selectedIndex.value)?.title?.lowercase() ?: ""
-                                if (title.contains("low")) PetMood.LowBattery else PetMood.Charging
-                            }
-                            IslandMode.Bluetooth -> PetMood.BluetoothConnected
-                            IslandMode.Music -> PetMood.Music
-                            IslandMode.IncomingCall -> PetMood.Calling
-                            IslandMode.DownloadUpload -> PetMood.Installing
-                            IslandMode.Hotspot -> PetMood.Hotspot
-                            IslandMode.Flashlight -> PetMood.Flashlight
-                            IslandMode.Empty -> PetMood.Idle
-                            else -> PetMood.Happy
+                combine(visibleNotifications, selectedIndex, settings) { list, index, config ->
+                    if (!config.enablePet) return@combine PetMood.Idle
+                    val notification = list.getOrNull(index)
+                    when (notification?.mode ?: IslandMode.Empty) {
+                        IslandMode.Battery -> {
+                            val title = notification?.title.orEmpty().lowercase(java.util.Locale.ROOT)
+                            if (title.contains("low") || title.contains("baixa")) PetMood.LowBattery else PetMood.Charging
                         }
-                        if (petMood != PetMood.Idle || petState.value.mood != PetMood.Tapped) {
-                            petState.value = IslandPetState(mood = petMood)
-                        }
+                        IslandMode.Bluetooth -> PetMood.BluetoothConnected
+                        IslandMode.Music -> PetMood.Music
+                        IslandMode.IncomingCall -> PetMood.Calling
+                        IslandMode.DownloadUpload -> PetMood.Installing
+                        IslandMode.Hotspot -> PetMood.Hotspot
+                        IslandMode.Flashlight -> PetMood.Flashlight
+                        IslandMode.Empty -> PetMood.Idle
+                        else -> PetMood.Happy
+                    }
+                }.collect { petMood ->
+                    activePetMood = petMood
+                    val reacting = petState.value.mood == PetMood.Tapped || petState.value.mood == PetMood.Dragging
+                    val important = petMood == PetMood.Calling || petMood == PetMood.LowBattery
+                    if (!settings.value.enablePet || !reacting || important) {
+                        if (petState.value.mood != petMood) petState.value = IslandPetState(mood = petMood)
                     }
                 }
             }
