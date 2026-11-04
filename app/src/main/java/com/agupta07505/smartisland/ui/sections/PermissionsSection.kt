@@ -1,4 +1,4 @@
-        RootPermissionSetupCard(onRefreshPermissions = onRefreshPermissions)\n\n/*
+/*
  * Smart Island (2026)
  * © Animesh Gupta — github.com/agupta07505
  * Licensed under the GNU GPL v3 License
@@ -84,6 +84,8 @@ fun PermissionsSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        RootPermissionSetupCard(onRefreshPermissions = onRefreshPermissions)
+
         // Shizuku 1-Tap Auto Setup Card
         Card(
             modifier = Modifier.fillMaxWidth(),
