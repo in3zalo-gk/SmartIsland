@@ -50,63 +50,27 @@ fun PetSection(settings: SmartIslandSettings, repository: SmartIslandSettingsRep
  var displayedMood by remember { mutableStateOf(PetMood.Idle) }
  var resetJob by remember { mutableStateOf<Job?>(null) }
  val displayedLabel = stringResource(previewMoodLabel(displayedMood))
- fun showTapReaction() {
-  resetJob?.cancel()
-  displayedMood = PetMood.Tapped
-  resetJob = scope.launch { delay(PET_PREVIEW_TAP_DURATION_MS); displayedMood = selectedMood }
- }
+ fun showTapReaction() { resetJob?.cancel(); displayedMood = PetMood.Tapped; resetJob = scope.launch { delay(PET_PREVIEW_TAP_DURATION_MS); displayedMood = selectedMood } }
  Column(Modifier.fillMaxWidth().animateContentSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-  Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f)), CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+  Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f)), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
    Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
     val previewDescription = stringResource(R.string.pet_preview_content_description, displayedLabel)
-    Box(Modifier.size(80.dp).clip(RoundedCornerShape(20.dp)).background(Color(settings.petColor).copy(alpha = .1f)).clickable(onClickLabel = stringResource(R.string.pet_preview_tap_action)) { showTapReaction() }.semantics { stateDescription = previewDescription }, contentAlignment = Alignment.Center) {
-     IslandPetComposable(displayedMood, settings.petColor, Modifier.size(48.dp), onTap = { showTapReaction() })
-    }
+    Box(Modifier.size(80.dp).clip(RoundedCornerShape(20.dp)).background(Color(settings.petColor).copy(alpha = .1f)).clickable(onClickLabel = stringResource(R.string.pet_preview_tap_action)) { showTapReaction() }.semantics { stateDescription = previewDescription }, contentAlignment = Alignment.Center) { IslandPetComposable(mood = displayedMood, petColor = settings.petColor, modifier = Modifier.size(48.dp), onTap = { showTapReaction() }) }
     Text(stringResource(R.string.pet_preview_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     Text(stringResource(R.string.pet_preview_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     Surface(color = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(50)) { Text(stringResource(R.string.pet_preview_showing_state, displayedLabel), Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium) }
     Text(stringResource(R.string.pet_preview_choose_state), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-     PET_PREVIEW_MOODS.forEach { mood -> FilterChip(selectedMood == mood, { resetJob?.cancel(); selectedMood = mood; displayedMood = mood }, { Text(stringResource(previewMoodLabel(mood))) }, Modifier.heightIn(min = 48.dp)) }
-    }
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) { PET_PREVIEW_MOODS.forEach { mood -> FilterChip(selected = selectedMood == mood, onClick = { resetJob?.cancel(); selectedMood = mood; displayedMood = mood }, label = { Text(stringResource(previewMoodLabel(mood))) }, modifier = Modifier.heightIn(min = 48.dp)) } }
     Text(stringResource(R.string.pet_preview_local_only), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
    }
   }
-  Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f)), CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+  Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f)), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = .12f)), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Pets, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) }
-      Column { Text("Enable Pet", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold); Text("Show the pet inside the island", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-     }
-     Switch(settings.enablePet, { scope.launch { repository.setEnablePet(it) } }, colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = .3f)))
-    }
-    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-     Column(Modifier.weight(1f)) { Text("Pet Inside Island", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold); Text("Show pet in the corner when expanded", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-     Switch(settings.petInsideIsland, settings.enablePet, { scope.launch { repository.setPetInsideIsland(it) } }, colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = .3f)))
-    }
+    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) { Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = .12f)), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Pets, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) }; Column { Text("Enable Pet", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold); Text("Show the pet inside the island", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }; Switch(checked = settings.enablePet, onCheckedChange = { scope.launch { repository.setEnablePet(it) } }, colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = .3f))) }
+    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("Pet Inside Island", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold); Text("Show pet in the corner when expanded", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; Switch(checked = settings.petInsideIsland, onCheckedChange = { scope.launch { repository.setPetInsideIsland(it) } }, enabled = settings.enablePet, colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary, checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = .3f))) }
    }
   }
-  if (settings.enablePet) Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f)), CardDefaults.cardElevation(defaultElevation = 0.dp)) {
-   Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-    Text("PET COLOR", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = .8.sp)
-    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { PET_PRESET_COLORS.forEach { (colorValue, _) ->
-     val selected = settings.petColor == colorValue
-     Box(Modifier.size(40.dp).then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier.border(.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .3f), CircleShape)).padding(2.dp).clip(CircleShape).background(Color(colorValue)).bounceClick { scope.launch { repository.setPetColor(colorValue) } }, contentAlignment = Alignment.Center) { if (selected) Text("✓", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-    } }
-   }
-  }
+  if (settings.enablePet) Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f)), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) { Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("PET COLOR", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = .8.sp); FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { PET_PRESET_COLORS.forEach { (colorValue, _) -> val selected = settings.petColor == colorValue; Box(Modifier.size(40.dp).then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier.border(.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .3f), CircleShape)).padding(2.dp).clip(CircleShape).background(Color(colorValue)).bounceClick { scope.launch { repository.setPetColor(colorValue) } }, contentAlignment = Alignment.Center) { if (selected) Text("✓", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) } } } } }
  }
 }
-
-private fun previewMoodLabel(mood: PetMood): Int = when (mood) {
- PetMood.Idle -> R.string.pet_preview_mood_idle
- PetMood.Happy -> R.string.pet_preview_mood_happy
- PetMood.Excited -> R.string.pet_preview_mood_excited
- PetMood.Sleeping -> R.string.pet_preview_mood_sleeping
- PetMood.Charging -> R.string.pet_preview_mood_charging
- PetMood.Music -> R.string.pet_preview_mood_music
- PetMood.LowBattery -> R.string.pet_preview_mood_low_battery
- PetMood.Tapped -> R.string.pet_preview_mood_tapped
- else -> R.string.pet_preview_mood_idle
-}
+private fun previewMoodLabel(mood: PetMood): Int = when (mood) { PetMood.Idle -> R.string.pet_preview_mood_idle; PetMood.Happy -> R.string.pet_preview_mood_happy; PetMood.Excited -> R.string.pet_preview_mood_excited; PetMood.Sleeping -> R.string.pet_preview_mood_sleeping; PetMood.Charging -> R.string.pet_preview_mood_charging; PetMood.Music -> R.string.pet_preview_mood_music; PetMood.LowBattery -> R.string.pet_preview_mood_low_battery; PetMood.Tapped -> R.string.pet_preview_mood_tapped; else -> R.string.pet_preview_mood_idle }
