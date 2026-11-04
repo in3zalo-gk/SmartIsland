@@ -79,6 +79,7 @@ fun StatisticsSection(statsRepository: NotificationStatsRepository) {
             .toDays(System.currentTimeMillis() - stats.firstUseTimestamp)
             .coerceAtLeast(1)
     }
+    val resetContentDescription = stringResource(R.string.dashboard_reset_content_description)
 
     Column(
         modifier = Modifier
@@ -88,35 +89,12 @@ fun StatisticsSection(statsRepository: NotificationStatsRepository) {
     ) {
         DashboardCard {
             DashboardTitle(R.string.dashboard_overview)
-            StatRow(
-                icon = Icons.Rounded.Notifications,
-                color = MaterialTheme.colorScheme.primary,
-                label = stringResource(R.string.dashboard_total_notifications),
-                value = total.toString()
-            )
-            StatRow(
-                icon = Icons.Rounded.TouchApp,
-                color = Color(0xFF10B981),
-                label = stringResource(R.string.dashboard_opened_tapped),
-                value = tapped.toString()
-            )
-            StatRow(
-                icon = Icons.Rounded.Delete,
-                color = Color(0xFFEF4444),
-                label = stringResource(R.string.dashboard_dismissed),
-                value = dismissed.toString()
-            )
+            StatRow(Icons.Rounded.Notifications, MaterialTheme.colorScheme.primary, stringResource(R.string.dashboard_total_notifications), total.toString())
+            StatRow(Icons.Rounded.TouchApp, Color(0xFF10B981), stringResource(R.string.dashboard_opened_tapped), tapped.toString())
+            StatRow(Icons.Rounded.Delete, Color(0xFFEF4444), stringResource(R.string.dashboard_dismissed), dismissed.toString())
             Spacer(modifier = Modifier.height(4.dp))
-            RateBar(
-                label = stringResource(R.string.dashboard_engagement_rate),
-                percentage = engagement,
-                color = MaterialTheme.colorScheme.primary
-            )
-            RateBar(
-                label = stringResource(R.string.dashboard_dismissal_rate),
-                percentage = dismissal,
-                color = MaterialTheme.colorScheme.error
-            )
+            RateBar(stringResource(R.string.dashboard_engagement_rate), engagement, MaterialTheme.colorScheme.primary)
+            RateBar(stringResource(R.string.dashboard_dismissal_rate), dismissal, MaterialTheme.colorScheme.error)
         }
 
         DashboardCard {
@@ -133,39 +111,22 @@ fun StatisticsSection(statsRepository: NotificationStatsRepository) {
 
         DashboardCard {
             DashboardTitle(R.string.dashboard_insights)
-            StatRow(
-                icon = Icons.Rounded.Analytics,
-                color = Color(0xFF8B5CF6),
-                label = stringResource(R.string.dashboard_days_active),
-                value = days.toString()
-            )
-            StatRow(
-                icon = Icons.Rounded.Bolt,
-                color = Color(0xFFF59E0B),
-                label = stringResource(R.string.dashboard_average_notifications_per_day),
-                value = (total / days).toString()
-            )
+            StatRow(Icons.Rounded.Analytics, Color(0xFF8B5CF6), stringResource(R.string.dashboard_days_active), days.toString())
+            StatRow(Icons.Rounded.Bolt, Color(0xFFF59E0B), stringResource(R.string.dashboard_average_notifications_per_day), (total / days).toString())
         }
 
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics {
-                    contentDescription = stringResource(R.string.dashboard_reset_content_description)
-                },
+                .semantics { contentDescription = resetContentDescription },
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f)
-            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f)),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             onClick = { confirmReset = true }
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -192,12 +153,10 @@ fun StatisticsSection(statsRepository: NotificationStatsRepository) {
             title = { Text(text = stringResource(R.string.dashboard_reset_confirmation_title)) },
             text = { Text(text = stringResource(R.string.dashboard_reset_confirmation_message)) },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmReset = false
-                        scope.launch { statsRepository.resetStats() }
-                    }
-                ) {
+                TextButton(onClick = {
+                    confirmReset = false
+                    scope.launch { statsRepository.resetStats() }
+                }) {
                     Text(text = stringResource(R.string.dashboard_reset))
                 }
             },
@@ -216,16 +175,11 @@ private fun DashboardCard(content: @Composable ColumnScope.() -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f)
-        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             content = content
         )
@@ -246,16 +200,17 @@ private fun DashboardTitle(stringRes: Int) {
 @Composable
 private fun RateBar(label: String, percentage: Int, color: Color) {
     val safePercentage = percentage.coerceIn(0, 100)
+    val progressDescription = stringResource(
+        R.string.dashboard_rate_progress_description,
+        label,
+        safePercentage
+    )
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold
-            )
+            Text(text = label, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
             Text(
                 text = stringResource(R.string.dashboard_percentage, safePercentage),
                 style = MaterialTheme.typography.bodySmall,
@@ -269,13 +224,7 @@ private fun RateBar(label: String, percentage: Int, color: Color) {
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .5f))
-                .semantics {
-                    contentDescription = stringResource(
-                        R.string.dashboard_rate_progress_description,
-                        label,
-                        safePercentage
-                    )
-                }
+                .semantics { contentDescription = progressDescription }
         ) {
             Box(
                 modifier = Modifier
@@ -290,12 +239,11 @@ private fun RateBar(label: String, percentage: Int, color: Color) {
 
 @Composable
 private fun EmptyAppsState() {
+    val noActivityContentDescription = stringResource(R.string.dashboard_no_app_activity_content_description)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .semantics {
-                contentDescription = stringResource(R.string.dashboard_no_app_activity_content_description)
-            },
+            .semantics { contentDescription = noActivityContentDescription },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -306,16 +254,8 @@ private fun EmptyAppsState() {
             modifier = Modifier.size(20.dp)
         )
         Column {
-            Text(
-                text = stringResource(R.string.dashboard_no_activity_yet),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = stringResource(R.string.dashboard_no_activity_message),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(text = stringResource(R.string.dashboard_no_activity_yet), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(text = stringResource(R.string.dashboard_no_activity_message), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -338,35 +278,18 @@ private fun StatRow(icon: ImageVector, color: Color, label: String, value: Strin
                     .background(color.copy(alpha = .12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(16.dp)
-                )
+                Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
             }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold
-            )
+            Text(text = label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
         }
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
+        Text(text = value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
 private fun AppStatRow(stat: AppStat, maximum: Int, rank: Int) {
     val count = stat.count.coerceAtLeast(0)
-    val fraction = if (maximum > 0) {
-        (count.toFloat() / maximum).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
+    val fraction = if (maximum > 0) (count.toFloat() / maximum).coerceIn(0f, 1f) else 0f
     val rankColor = when (rank) {
         1 -> Color(0xFFFFD700)
         2 -> Color(0xFFC0C0C0)
@@ -376,6 +299,7 @@ private fun AppStatRow(stat: AppStat, maximum: Int, rank: Int) {
     val name = stat.appName.ifBlank { stat.packageName }.ifBlank {
         stringResource(R.string.dashboard_unknown_app)
     }
+    val rankDescription = stringResource(R.string.dashboard_app_rank_description, rank, name, count)
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
@@ -394,26 +318,11 @@ private fun AppStatRow(stat: AppStat, maximum: Int, rank: Int) {
                         .background(rankColor.copy(alpha = .2f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = rank.toString(),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = rankColor
-                    )
+                    Text(text = rank.toString(), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = rankColor)
                 }
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1
-                )
+                Text(text = name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1)
             }
-            Text(
-                text = count.toString(),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Text(text = count.toString(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }
         Box(
             modifier = Modifier
@@ -421,14 +330,7 @@ private fun AppStatRow(stat: AppStat, maximum: Int, rank: Int) {
                 .height(6.dp)
                 .clip(RoundedCornerShape(3.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .4f))
-                .semantics {
-                    contentDescription = stringResource(
-                        R.string.dashboard_app_rank_description,
-                        rank,
-                        name,
-                        count
-                    )
-                }
+                .semantics { contentDescription = rankDescription }
         ) {
             Box(
                 modifier = Modifier
