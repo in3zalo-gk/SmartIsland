@@ -1,4 +1,4 @@
-/*
+        RootPermissionSetupCard(onRefreshPermissions = onRefreshPermissions)\n\n/*
  * Smart Island (2026)
  * © Animesh Gupta — github.com/agupta07505
  * Licensed under the GNU GPL v3 License
