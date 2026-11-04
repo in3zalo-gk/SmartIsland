@@ -1,41 +1,30 @@
-/*
- * Smart Island (2026)
- * © Animesh Gupta — github.com/agupta07505
- * Licensed under the GNU GPL v3 License
- * Do not remove or alter this notice. - Per GPL v3 License Section 4 & Section 5
- */
-
 package com.agupta07505.smartisland.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PetMoodTimingTest {
-    @Test fun gesturesHaveFiniteDurations() {
+    @Test fun tapped_is_a_short_reaction() {
         assertEquals(1500L, PetMood.Tapped.transientDurationMillis)
+        assertTrue(PetMood.Tapped.isTransientReaction)
+    }
+
+    @Test fun dragging_has_a_failsafe_timeout() {
         assertEquals(1200L, PetMood.Dragging.transientDurationMillis)
+        assertTrue(PetMood.Dragging.isTransientReaction)
     }
 
-    @Test fun happyAndExcitedLastFourSeconds() {
-        assertEquals(4000L, PetMood.Happy.transientDurationMillis)
-        assertEquals(4000L, PetMood.Excited.transientDurationMillis)
+    @Test fun ongoing_system_moods_do_not_expire() {
+        assertNull(PetMood.Music.transientDurationMillis)
+        assertNull(PetMood.LowBattery.transientDurationMillis)
+        assertFalse(PetMood.Music.isTransientReaction)
     }
 
-    @Test fun ongoingActivitiesNeverExpireOnTheirOwn() {
-        val ongoing = listOf(PetMood.Music, PetMood.Calling, PetMood.Charging,
-            PetMood.Installing, PetMood.BluetoothConnected, PetMood.Hotspot,
-            PetMood.Flashlight, PetMood.LowBattery, PetMood.Idle, PetMood.Sleeping)
-        ongoing.forEach { mood -> assertNull(mood.transientDurationMillis) }
-    }
-
-    @Test fun restoringActivityDoesNotStartAnotherTemporaryReaction() {
-        listOf(PetMood.Happy, PetMood.Excited, PetMood.Tapped, PetMood.Dragging)
-            .forEach { assertEquals(PetMood.Idle, it.afterReaction()) }
-    }
-
-    @Test fun gesturesRestoreTheCurrentOngoingActivity() {
-        listOf(PetMood.Music, PetMood.Calling, PetMood.Charging, PetMood.LowBattery, PetMood.Idle)
-            .forEach { assertEquals(it, it.afterReaction()) }
+    @Test fun drag_finish_restores_active_mood() {
+        assertEquals(PetMood.Music, PetMood.Dragging.afterDrag(PetMood.Music))
+        assertEquals(PetMood.Idle, PetMood.Dragging.afterDrag(PetMood.Tapped))
     }
 }

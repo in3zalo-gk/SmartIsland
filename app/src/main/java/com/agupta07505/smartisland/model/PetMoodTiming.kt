@@ -11,11 +11,23 @@ package com.agupta07505.smartisland.model
 internal val PetMood.transientDurationMillis: Long?
     get() = when (this) {
         PetMood.Tapped -> 1500L
+        // Dragging is owned by the pointer lifecycle. Keeping this finite also
+        // prevents a cancelled gesture from leaving the pet enlarged forever.
         PetMood.Dragging -> 1200L
         PetMood.Happy, PetMood.Excited -> 4000L
         else -> null
     }
 
+internal val PetMood.isTransientReaction: Boolean
+    get() = transientDurationMillis != null
+
 /** Restore ongoing activity after a gesture without restarting a transient reaction. */
 internal fun PetMood.afterReaction(): PetMood =
-    if (transientDurationMillis == null) this else PetMood.Idle
+    if (isTransientReaction) PetMood.Idle else this
+
+/**
+ * The gesture ending is intentionally independent from the timeout: an active
+ * system mood should resume as soon as a drag finishes.
+ */
+internal fun PetMood.afterDrag(activeMood: PetMood): PetMood =
+    if (this == PetMood.Dragging) activeMood.afterReaction() else this
