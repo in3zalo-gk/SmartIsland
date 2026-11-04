@@ -12,7 +12,6 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -26,26 +25,29 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.agupta07505.smartisland.R
 import com.agupta07505.smartisland.model.PetMood
 import kotlinx.coroutines.delay
 
 /**
- * A cute square virtual pet that lives inside or near the Dynamic Island.
- * It reacts to system events with different facial expressions and animations.
- * Can be dragged around and tapped for interactions.
+ * Small animated pet used by both the preview and the live overlay. Gesture
+ * callbacks are lifecycle-aware so callers can always clear Dragging when a
+ * pointer is cancelled by the window manager.
  */
 @Composable
 fun IslandPetComposable(
@@ -53,295 +55,112 @@ fun IslandPetComposable(
     petColor: Long,
     modifier: Modifier = Modifier,
     onTap: () -> Unit = {},
-    onDrag: (Float, Float) -> Unit = { _, _ -> }
+    onDrag: (Float, Float) -> Unit = { _, _ -> },
+    onDragStart: () -> Unit = {},
+    onDragEnd: () -> Unit = {},
+    onMotionChanged: (PetMood) -> Unit = {}
 ) {
-    val baseColor = Color(petColor)
-    val infiniteTransition = rememberInfiniteTransition(label = "petAnimations")
-
-    // Breathing animation (idle bob)
-    val breatheScale by infiniteTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "breathe"
+    val currentTap by rememberUpdatedState(onTap)
+    val currentDrag by rememberUpdatedState(onDrag)
+    val currentDragStart by rememberUpdatedState(onDragStart)
+    val currentDragEnd by rememberUpdatedState(onDragEnd)
+    val currentMotionChanged by rememberUpdatedState(onMotionChanged)
+    val transition = rememberInfiniteTransition(label = "petMotion")
+    val breathing by transition.animateFloat(
+        initialValue = 0.96f, targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "petBreathing"
     )
-
-    // Bounce animation for excited states
-    val bounceY by infiniteTransition.animateFloat(
+    val bounce by transition.animateFloat(
         initialValue = 0f,
         targetValue = if (mood == PetMood.Excited || mood == PetMood.Happy) -3f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bounce"
+        animationSpec = infiniteRepeatable(tween(560, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "petBounce"
     )
-
-    // Rotation for installing
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = if (mood == PetMood.Installing) 360f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotation"
+    val rotation by transition.animateFloat(
+        initialValue = 0f, targetValue = if (mood == PetMood.Installing) 360f else 0f,
+        animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Restart),
+        label = "petRotation"
     )
+    val sleepAlpha by transition.animateFloat(
+        initialValue = 0f, targetValue = if (mood == PetMood.Sleeping) 1f else 0f,
+        animationSpec = infiniteRepeatable(tween(1300), RepeatMode.Reverse), label = "petSleep"
+    )
+    var blinking by remember { mutableStateOf(false) }
 
-    // Blink animation
-    var isBlinking by remember { mutableStateOf(false) }
-    LaunchedEffect(mood) {
+    // Observer keeps overlay state in sync even when a system mood changes
+    // without pointer input (battery, music, calls, installation).
+    LaunchedEffect(mood) { currentMotionChanged(mood) }
+    LaunchedEffect(Unit) {
         while (true) {
-            delay((2000L..5000L).random())
-            isBlinking = true
-            delay(150L)
-            isBlinking = false
+            delay(3000)
+            blinking = true
+            delay(130)
+            blinking = false
         }
     }
 
-    // Sleep Z animation
-    val sleepAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = if (mood == PetMood.Sleeping) 1f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "sleepAlpha"
-    )
-
-    val animatedScale = when (mood) {
-        PetMood.Tapped -> 0.85f
+    val scale = when (mood) {
+        PetMood.Tapped -> .86f
         PetMood.Dragging -> 1.1f
-        PetMood.Excited -> breatheScale * 1.1f
-        else -> breatheScale
+        PetMood.Excited -> breathing * 1.08f
+        else -> breathing
     }
-
+    val description = stringResource(R.string.pet_content_description)
     Box(
         modifier = modifier
             .size(28.dp)
+            .semantics { contentDescription = description }
             .graphicsLayer {
-                scaleX = animatedScale
-                scaleY = animatedScale
-                translationY = bounceY
+                scaleX = scale
+                scaleY = scale
+                translationY = bounce
                 rotationZ = rotation
             }
             .clip(RoundedCornerShape(8.dp))
-            .background(baseColor)
-            .pointerInput(mood) {
-                detectTapGestures { onTap() }
-            }
-            .pointerInput(mood) {
+            .background(Color(petColor))
+            .pointerInput(Unit) { detectTapGestures(onTap = { currentTap() }) }
+            .pointerInput(Unit) {
                 detectDragGestures(
-                    onDragStart = { },
-                    onDrag = { change, dragAmount ->
+                    onDragStart = { currentDragStart() },
+                    onDragCancel = { currentDragEnd() },
+                    onDragEnd = { currentDragEnd() },
+                    onDrag = { change, amount ->
                         change.consume()
-                        onDrag(dragAmount.x, dragAmount.y)
+                        currentDrag(amount.x, amount.y)
                     }
                 )
             },
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(28.dp)) {
-            drawPetFace(mood, isBlinking, sleepAlpha)
+        Canvas(Modifier.size(28.dp)) {
+            val w = size.width
+            val h = size.height
+            val eyeY = h * .38f
+            val left = w * .30f
+            val right = w * .70f
+            val eye = w * .07f
+            val white = Color.White
+            if (mood == PetMood.Sleeping || blinking) {
+                drawLine(white, Offset(left - eye, eyeY), Offset(left + eye, eyeY), 2f)
+                drawLine(white, Offset(right - eye, eyeY), Offset(right + eye, eyeY), 2f)
+            } else if (mood == PetMood.Excited || mood == PetMood.Happy) {
+                drawCircle(white, eye * 1.25f, Offset(left, eyeY))
+                drawCircle(white, eye * 1.25f, Offset(right, eyeY))
+            } else {
+                drawCircle(white, eye, Offset(left, eyeY))
+                drawCircle(white, eye, Offset(right, eyeY))
+                drawCircle(Color(0xFF1A1A2E), eye * .48f, Offset(left, eyeY))
+                drawCircle(Color(0xFF1A1A2E), eye * .48f, Offset(right, eyeY))
+            }
+            val mouthY = h * .64f
+            when (mood) {
+                PetMood.LowBattery -> drawArc(white, 200f, 140f, false, Offset(w*.38f, mouthY), androidx.compose.ui.geometry.Size(w*.24f, w*.12f), Stroke(2f))
+                PetMood.Tapped -> drawCircle(white, w*.05f, Offset(w/2, mouthY))
+                PetMood.Installing -> drawLine(white, Offset(w*.42f, mouthY), Offset(w*.58f, mouthY), 2f)
+                else -> drawArc(white, 25f, 130f, false, Offset(w*.38f, mouthY-w*.05f), androidx.compose.ui.geometry.Size(w*.24f, w*.13f), Stroke(2f))
+            }
+            if (sleepAlpha > .05f) drawLine(white.copy(alpha = sleepAlpha), Offset(w*.72f,h*.14f), Offset(w*.88f,h*.14f), 1.5f)
         }
     }
 }
-
-private fun DrawScope.drawPetFace(
-    mood: PetMood,
-    isBlinking: Boolean,
-    sleepAlpha: Float
-) {
-    val w = size.width
-    val h = size.height
-    val cx = w / 2f
-    val eyeY = h * 0.38f
-    val eyeSpacing = w * 0.22f
-    val eyeRadius = w * 0.07f
-
-    val leftEyeX = cx - eyeSpacing
-    val rightEyeX = cx + eyeSpacing
-
-    // Draw eyes based on mood
-    when {
-        mood == PetMood.Sleeping -> {
-            // Closed eyes (lines)
-            drawLine(
-                color = Color.White,
-                start = Offset(leftEyeX - eyeRadius, eyeY),
-                end = Offset(leftEyeX + eyeRadius, eyeY),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = Color.White,
-                start = Offset(rightEyeX - eyeRadius, eyeY),
-                end = Offset(rightEyeX + eyeRadius, eyeY),
-                strokeWidth = 2f
-            )
-        }
-        isBlinking -> {
-            drawLine(
-                color = Color.White,
-                start = Offset(leftEyeX - eyeRadius, eyeY),
-                end = Offset(leftEyeX + eyeRadius, eyeY),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = Color.White,
-                start = Offset(rightEyeX - eyeRadius, eyeY),
-                end = Offset(rightEyeX + eyeRadius, eyeY),
-                strokeWidth = 2f
-            )
-        }
-        mood == PetMood.Excited || mood == PetMood.Happy -> {
-            // Star eyes (^ ^)
-            drawStarEye(leftEyeX, eyeY, eyeRadius)
-            drawStarEye(rightEyeX, eyeY, eyeRadius)
-        }
-        mood == PetMood.Installing -> {
-            // Spiral/loading eyes (small circles with dots)
-            drawCircle(color = Color.White, radius = eyeRadius, center = Offset(leftEyeX, eyeY))
-            drawCircle(color = Color.White, radius = eyeRadius, center = Offset(rightEyeX, eyeY))
-            drawCircle(color = baseColorForPet(), radius = eyeRadius * 0.4f, center = Offset(leftEyeX, eyeY))
-            drawCircle(color = baseColorForPet(), radius = eyeRadius * 0.4f, center = Offset(rightEyeX, eyeY))
-        }
-        mood == PetMood.Music -> {
-            // Closed happy eyes for music
-            drawArc(
-                color = Color.White,
-                startAngle = 20f,
-                sweepAngle = 140f,
-                useCenter = false,
-                topLeft = Offset(leftEyeX - eyeRadius, eyeY - eyeRadius * 0.7f),
-                size = Size(eyeRadius * 2, eyeRadius * 1.4f),
-                style = Stroke(width = 2f)
-            )
-            drawArc(
-                color = Color.White,
-                startAngle = 20f,
-                sweepAngle = 140f,
-                useCenter = false,
-                topLeft = Offset(rightEyeX - eyeRadius, eyeY - eyeRadius * 0.7f),
-                size = Size(eyeRadius * 2, eyeRadius * 1.4f),
-                style = Stroke(width = 2f)
-            )
-        }
-        else -> {
-            // Normal round eyes
-            drawCircle(color = Color.White, radius = eyeRadius, center = Offset(leftEyeX, eyeY))
-            drawCircle(color = Color.White, radius = eyeRadius, center = Offset(rightEyeX, eyeY))
-            drawCircle(color = Color(0xFF1A1A2E), radius = eyeRadius * 0.55f, center = Offset(leftEyeX, eyeY))
-            drawCircle(color = Color(0xFF1A1A2E), radius = eyeRadius * 0.55f, center = Offset(rightEyeX, eyeY))
-        }
-    }
-
-    // Draw mouth based on mood
-    val mouthY = h * 0.62f
-    when (mood) {
-        PetMood.Happy, PetMood.Excited, PetMood.Music -> {
-            // Big smile
-            drawArc(
-                color = Color.White,
-                startAngle = 20f,
-                sweepAngle = 140f,
-                useCenter = false,
-                topLeft = Offset(cx - w * 0.15f, mouthY - w * 0.08f),
-                size = Size(w * 0.3f, w * 0.16f),
-                style = Stroke(width = 2f)
-            )
-        }
-        PetMood.Sleeping -> {
-            // Small O mouth
-            drawCircle(
-                color = Color.White,
-                radius = w * 0.04f,
-                center = Offset(cx, mouthY),
-                style = Stroke(width = 1.5f)
-            )
-        }
-        PetMood.Installing -> {
-            // Focused straight line
-            drawLine(
-                color = Color.White,
-                start = Offset(cx - w * 0.08f, mouthY),
-                end = Offset(cx + w * 0.08f, mouthY),
-                strokeWidth = 2f
-            )
-        }
-        PetMood.Tapped -> {
-            // Small surprised O
-            drawCircle(color = Color.White, radius = w * 0.05f, center = Offset(cx, mouthY))
-        }
-        PetMood.Dragging -> {
-            // Wavy mouth
-            drawLine(
-                color = Color.White,
-                start = Offset(cx - w * 0.1f, mouthY),
-                end = Offset(cx + w * 0.1f, mouthY),
-                strokeWidth = 2f
-            )
-        }
-        PetMood.LowBattery -> {
-            // Sad mouth (frown)
-            drawArc(
-                color = Color.White,
-                startAngle = 200f,
-                sweepAngle = 140f,
-                useCenter = false,
-                topLeft = Offset(cx - w * 0.12f, mouthY),
-                size = Size(w * 0.24f, w * 0.12f),
-                style = Stroke(width = 2f)
-            )
-        }
-        else -> {
-            // Neutral small smile
-            drawArc(
-                color = Color.White,
-                startAngle = 30f,
-                sweepAngle = 120f,
-                useCenter = false,
-                topLeft = Offset(cx - w * 0.1f, mouthY - w * 0.04f),
-                size = Size(w * 0.2f, w * 0.08f),
-                style = Stroke(width = 1.8f)
-            )
-        }
-    }
-
-    // Sleep Z's
-    if (sleepAlpha > 0.1f) {
-        drawLine(
-            color = Color.White.copy(alpha = sleepAlpha),
-            start = Offset(w * 0.7f, h * 0.15f),
-            end = Offset(w * 0.85f, h * 0.15f),
-            strokeWidth = 1.5f
-        )
-        drawLine(
-            color = Color.White.copy(alpha = sleepAlpha * 0.7f),
-            start = Offset(w * 0.72f, h * 0.08f),
-            end = Offset(w * 0.82f, h * 0.08f),
-            strokeWidth = 1.2f
-        )
-    }
-}
-
-private fun DrawScope.drawStarEye(cx: Float, cy: Float, radius: Float) {
-    val path = Path().apply {
-        val outerR = radius * 1.2f
-        val innerR = radius * 0.5f
-        for (i in 0 until 10) {
-            val angle = Math.PI * 2 * i / 10 - Math.PI / 2
-            val r = if (i % 2 == 0) outerR else innerR
-            val x = cx + (r * kotlin.math.cos(angle)).toFloat()
-            val y = cy + (r * kotlin.math.sin(angle)).toFloat()
-            if (i == 0) moveTo(x, y) else lineTo(x, y)
-        }
-        close()
-    }
-    drawPath(path, color = Color.White)
-}
-
-private fun baseColorForPet(): Color = Color(0xFF1A1A2E)
