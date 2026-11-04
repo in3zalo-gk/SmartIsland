@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Smart Island (2026) | © Animesh Gupta | GNU GPL v3. Do not remove or alter this notice. -->
+<resources>
+<string name="pet_preview_title">Island Pet</string><string name="pet_preview_description">Choose a look for your pet preview. It reacts here only and never triggers system events.</string><string name="pet_preview_choose_state">Preview state</string><string name="pet_preview_showing_state">Showing: %1$s</string><string name="pet_preview_local_only">Preview changes stay on this screen and are not saved as pet moods.</string><string name="pet_preview_content_description">Pet preview, currently %1$s. Tap to show its touch reaction.</string><string name="pet_preview_tap_action">Show touch reaction</string>
+<string name="pet_preview_mood_idle">Idle</string><string name="pet_preview_mood_happy">Happy</string><string name="pet_preview_mood_excited">Excited</string><string name="pet_preview_mood_sleeping">Sleeping</string><string name="pet_preview_mood_charging">Charging</string><string name="pet_preview_mood_music">Listening to music</string><string name="pet_preview_mood_low_battery">Low battery</string><string name="pet_preview_mood_tapped">Touched</string>
+</resources>
