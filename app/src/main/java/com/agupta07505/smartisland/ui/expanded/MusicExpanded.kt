@@ -21,6 +21,10 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import com.agupta07505.smartisland.ui.IslandText as Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -30,6 +34,11 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import com.agupta07505.smartisland.ui.expanded.lyrics.LrcLibLyricsRepository
+import com.agupta07505.smartisland.ui.expanded.lyrics.LrcParser
+import com.agupta07505.smartisland.ui.expanded.lyrics.LyricsLoadState
+import kotlinx.coroutines.Job
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -97,6 +106,16 @@ fun MusicExpanded(
     var localIsPlaying by remember(notification?.key, notification?.mediaIsPlaying) {
         mutableStateOf(notification?.mediaIsPlaying == true)
     }
+
+    // Privacy opt-in: no artist/track leaves the device until the user presses this card's button.
+    val lyricTrack = notification?.title?.trim().orEmpty()
+    val lyricArtist = notification?.text?.trim().orEmpty()
+    val lyricsTrackKey = "${notification?.key.orEmpty()}|$lyricArtist|$lyricTrack"
+    val lyricsScope = rememberCoroutineScope()
+    var lyricsRequest by remember { mutableStateOf<Job?>(null) }
+    var lyricsState by remember(lyricsTrackKey) { mutableStateOf<LyricsLoadState>(LyricsLoadState.Idle) }
+    LaunchedEffect(lyricsTrackKey) { lyricsRequest?.cancel(); lyricsRequest = null }
+    DisposableEffect(Unit) { onDispose { lyricsRequest?.cancel() } }
 
     val livePosition = remember(positionMs, controller) { mutableLongStateOf(getEstimatedPosition(positionMs)) }
 
@@ -397,9 +416,70 @@ fun MusicExpanded(
                     CustomControlButton(custom, controller, notification, 40.dp, resetTimer)
                 }
             }
+            Spacer(Modifier.height(10.dp))
+            LyricsSection(
+                state = lyricsState,
+                playbackPositionMs = if (positionMs != null || controller?.playbackState != null) livePosition.longValue else null,
+                canSearch = lyricArtist.isNotBlank() && lyricTrack.isNotBlank(),
+                onSearch = {
+                    lyricsRequest?.cancel()
+                    lyricsState = LyricsLoadState.Loading
+                    val requestedKey = lyricsTrackKey
+                    lyricsRequest = lyricsScope.launch {
+                        val result = LrcLibLyricsRepository.fetchSyncedLyrics(lyricArtist, lyricTrack)
+                        if (requestedKey == lyricsTrackKey) lyricsState = result
+                    }
+                }
+            )
         }
     }
     }
+}
+
+@Composable
+private fun LyricsSection(
+    state: LyricsLoadState,
+    playbackPositionMs: Long?,
+    canSearch: Boolean,
+    onSearch: () -> Unit
+) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Button(onClick = onSearch, enabled = canSearch && state !is LyricsLoadState.Loading) {
+            if (state is LyricsLoadState.Loading) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("Buscando letra…")
+            } else Text("Buscar letra")
+        }
+        Text(
+            if (canSearch) "Ao buscar, artista e faixa serão consultados no LRCLIB."
+            else "Não há artista e faixa suficientes para consultar o LRCLIB.",
+            color = LocalIslandPalette.current.textSecondary, fontSize = 10.sp
+        )
+        when (state) {
+            LyricsLoadState.Idle, LyricsLoadState.Loading -> Unit
+            LyricsLoadState.Instrumental -> LyricsMessage("Esta faixa é instrumental.")
+            LyricsLoadState.NotFound -> LyricsMessage("Não há letra sincronizada disponível para esta faixa.")
+            is LyricsLoadState.Error -> LyricsMessage("Não foi possível buscar a letra. Tente novamente.")
+            is LyricsLoadState.Available -> {
+                val active = LrcParser.activeLineIndex(state.lines, playbackPositionMs)
+                val first = maxOf(0, (active ?: 0) - 1)
+                val last = minOf(state.lines.lastIndex, (active ?: 0) + 2)
+                for (index in first..last) Text(
+                    state.lines[index].text.ifBlank { "♪" },
+                    color = if (index == active) LocalIslandPalette.current.text else LocalIslandPalette.current.textSecondary,
+                    fontSize = if (index == active) 14.sp else 12.sp,
+                    fontWeight = if (index == active) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LyricsMessage(message: String) {
+    Text(message, color = LocalIslandPalette.current.textSecondary, fontSize = 12.sp)
 }
 
 @Composable

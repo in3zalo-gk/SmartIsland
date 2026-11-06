@@ -9,6 +9,9 @@ package com.agupta07505.smartisland.data
 
 import android.content.Context
 import android.util.Log
+import com.agupta07505.smartisland.model.CommunitySkinParser
+import com.agupta07505.smartisland.model.IslandSkin
+import com.agupta07505.smartisland.model.IslandSkinPalette
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -40,6 +43,7 @@ private val Context.smartIslandDataStore by preferencesDataStore(
 
 class SmartIslandSettingsRepository(private val context: Context) {
     private object Keys {
+        val CommunitySkinJson = stringPreferencesKey("community_skin_json")
         val Enabled = booleanPreferencesKey("enabled")
         val Width = floatPreferencesKey("width")
         val Height = floatPreferencesKey("height")
@@ -144,6 +148,12 @@ class SmartIslandSettingsRepository(private val context: Context) {
         val PillSwipeRightAction = stringPreferencesKey("pill_swipe_right_action")
         val LongPressAction = stringPreferencesKey("long_press_action")
         val CirclePosition = stringPreferencesKey("circle_position")
+        val EnablePet = booleanPreferencesKey("enable_pet")
+        val PetColor = longPreferencesKey("pet_color")
+        val PetInsideIsland = booleanPreferencesKey("pet_inside_island")
+        val IslandSkin = stringPreferencesKey("island_skin")
+        val IslandSkinPalette = stringPreferencesKey("island_skin_palette")
+        val IslandSkinAnimationsEnabled = booleanPreferencesKey("island_skin_animations_enabled")
         val LandscapeShape = stringPreferencesKey("landscape_shape")
         val LandscapeWidth = floatPreferencesKey("landscape_width")
         val LandscapeHeight = floatPreferencesKey("landscape_height")
@@ -279,6 +289,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
         .map { prefs ->
             val defaults = SmartIslandSettings.Default
             SmartIslandSettings(
+                communitySkinJson = prefs[Keys.CommunitySkinJson]?.take(MAX_COMMUNITY_SKIN_JSON_BYTES) ?: "",
                 enabled = prefs[Keys.Enabled] ?: defaults.enabled,
                 width = validDimension(
                     prefs[Keys.Width],
@@ -452,6 +463,12 @@ class SmartIslandSettingsRepository(private val context: Context) {
                 pillSwipeRightAction = prefs[Keys.PillSwipeRightAction] ?: defaults.pillSwipeRightAction,
                 longPressAction = prefs[Keys.LongPressAction] ?: defaults.longPressAction,
                 circlePosition = prefs[Keys.CirclePosition]?.takeIf { it in VALID_CIRCLE_POSITIONS } ?: defaults.circlePosition,
+                enablePet = prefs[Keys.EnablePet] ?: defaults.enablePet,
+                petColor = validColor(prefs[Keys.PetColor], defaults.petColor),
+                petInsideIsland = prefs[Keys.PetInsideIsland] ?: defaults.petInsideIsland,
+                islandSkin = IslandSkin.fromStorage(prefs[Keys.IslandSkin]),
+                islandSkinPalette = IslandSkinPalette.fromStorage(prefs[Keys.IslandSkinPalette]),
+                islandSkinAnimationsEnabled = prefs[Keys.IslandSkinAnimationsEnabled] ?: defaults.islandSkinAnimationsEnabled,
                 landscapeShape = prefs[Keys.LandscapeShape]?.takeIf { it in VALID_LANDSCAPE_SHAPES } ?: defaults.landscapeShape,
                 landscapeWidth = validDimension(prefs[Keys.LandscapeWidth], defaults.landscapeWidth, SmartIslandSettings.MIN_WIDTH, SmartIslandSettings.MAX_WIDTH),
                 landscapeHeight = validDimension(prefs[Keys.LandscapeHeight], defaults.landscapeHeight, SmartIslandSettings.MIN_HEIGHT, SmartIslandSettings.MAX_HEIGHT),
@@ -1364,6 +1381,12 @@ class SmartIslandSettingsRepository(private val context: Context) {
     suspend fun setCirclePosition(value: String) = editSafely {
         it[Keys.CirclePosition] = if (value in VALID_CIRCLE_POSITIONS) value else SmartIslandSettings.CIRCLE_POSITION_RIGHT
     }
+    suspend fun setEnablePet(value: Boolean) = editSafely { it[Keys.EnablePet] = value }
+    suspend fun setPetColor(value: Long) = editSafely { it[Keys.PetColor] = validColor(value, SmartIslandSettings.Default.petColor) }
+    suspend fun setPetInsideIsland(value: Boolean) = editSafely { it[Keys.PetInsideIsland] = value }
+    suspend fun setIslandSkin(value: IslandSkin) = editSafely { it[Keys.IslandSkin] = value.storageValue }
+    suspend fun setIslandSkinPalette(value: IslandSkinPalette) = editSafely { it[Keys.IslandSkinPalette] = value.storageValue }
+    suspend fun setIslandSkinAnimationsEnabled(value: Boolean) = editSafely { it[Keys.IslandSkinAnimationsEnabled] = value }
     suspend fun setNotificationCooldownSystemEvents(eventIds: Set<String>) = editSafely {
         it[Keys.NotificationCooldownSystemEvents] = eventIds
     }
@@ -1380,7 +1403,20 @@ class SmartIslandSettingsRepository(private val context: Context) {
         }
     }
 
+    /** Updates only the community-skin key; non-empty values must satisfy the bounded skin schema. */
+    suspend fun setCommunitySkinJson(raw: String) {
+        val json = if (raw.isBlank()) {
+            ""
+        } else {
+            require(raw.toByteArray(Charsets.UTF_8).size <= MAX_COMMUNITY_SKIN_JSON_BYTES) { "O arquivo excede 24 KB" }
+            CommunitySkinParser.parse(raw).getOrThrow()
+            raw
+        }
+        editSafely { it[Keys.CommunitySkinJson] = json }
+    }
+
     suspend fun restoreSettings(settings: SmartIslandSettings) = editSafely { prefs ->
+        prefs[Keys.CommunitySkinJson] = settings.communitySkinJson.take(MAX_COMMUNITY_SKIN_JSON_BYTES)
         prefs[Keys.Enabled] = settings.enabled
         prefs[Keys.Width] = validDimension(
             settings.width,
@@ -1539,6 +1575,12 @@ class SmartIslandSettingsRepository(private val context: Context) {
         } else {
             SmartIslandSettings.CIRCLE_POSITION_RIGHT
         }
+        prefs[Keys.EnablePet] = settings.enablePet
+        prefs[Keys.PetColor] = validColor(settings.petColor, SmartIslandSettings.Default.petColor)
+        prefs[Keys.PetInsideIsland] = settings.petInsideIsland
+        prefs[Keys.IslandSkin] = settings.islandSkin.storageValue
+        prefs[Keys.IslandSkinPalette] = settings.islandSkinPalette.storageValue
+        prefs[Keys.IslandSkinAnimationsEnabled] = settings.islandSkinAnimationsEnabled
         prefs[Keys.LandscapeShape] = settings.landscapeShape.takeIf { it in VALID_LANDSCAPE_SHAPES }
             ?: SmartIslandSettings.Default.landscapeShape
         prefs[Keys.LandscapeWidth] = settings.landscapeWidth
@@ -1727,6 +1769,7 @@ class SmartIslandSettingsRepository(private val context: Context) {
     private companion object {
         const val TAG = "SmartIslandSettings"
         const val MAX_SHORTCUTS = 8
+        const val MAX_COMMUNITY_SKIN_JSON_BYTES = 24 * 1024
         const val MAX_PACKAGE_NAME_LENGTH = 255
         val VALID_LOCK_SCREEN_PRIVACY_VALUES = setOf("AppIconOnly", "FullContent")
         val VALID_CIRCLE_POSITIONS = setOf(

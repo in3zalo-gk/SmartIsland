@@ -1,0 +1,1 @@
+{"version":1,"id":"lightspeed","name":"Lightspeed","author":"Smart Island project","license":"GPL-3.0-or-later","baseStyle":"lightspeed","states":{"idle":{"colors":["#15C7DE","#7A5CFF","#F04DAB","#FFD166"],"animation":{"type":"flow","speed":0.75}}}}

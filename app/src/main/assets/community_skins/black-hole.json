@@ -1,0 +1,1 @@
+{"version":1,"id":"black-hole","name":"Black hole","author":"Smart Island project","license":"GPL-3.0-or-later","baseStyle":"black_hole","states":{"idle":{"colors":["#030305","#1C102B","#6D3AA8"],"animation":{"type":"pulse","speed":0.6}}}}

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_principal">Principal</string>
+    <string name="tab_layout">Disposição</string>
+    <string name="tab_community">Comunidade</string>
+    <string name="nav_group_events">Controles e atividades ao vivo</string>
+    <string name="nav_group_features">Recursos da ilha</string>
+    <string name="nav_group_demo">Prévia e demonstração</string>
+    <string name="nav_group_visual">Aparência e cores</string>
+    <string name="nav_group_layout">Posição e disposição</string>
+    <string name="nav_color_studio_subtitle">Cores, opacidade, gradientes e estilos de cartão</string>
+    <string name="nav_font_summary">Tipografia e mistura de fontes</string>
+    <string name="nav_glance_title">Glance · resumo e rotinas</string>
+    <string name="nav_glance_subtitle">Resumo, agenda, água e oração</string>
+    <string name="nav_pet_subtitle">Companheiro flutuante da ilha</string>
+    <string name="nav_notifications_subtitle">Apps, eventos e privacidade na tela bloqueada</string>
+    <string name="nav_history_subtitle">Notificações exibidas pela ilha</string>
+    <string name="nav_shortcuts_subtitle">Abra apps favoritos pela ilha</string>
+    <string name="nav_gestures_subtitle">Deslizes, toques, toque longo e vibração</string>
+    <string name="nav_idle_subtitle">Widgets exibidos quando a ilha está inativa</string>
+    <string name="nav_timing_subtitle">Tempo e duração do conteúdo da ilha</string>
+</resources>

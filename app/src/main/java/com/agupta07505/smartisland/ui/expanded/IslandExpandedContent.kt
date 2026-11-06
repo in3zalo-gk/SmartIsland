@@ -89,6 +89,7 @@ import com.agupta07505.smartisland.util.GestureSensitivity
 import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.res.stringResource
 import com.agupta07505.smartisland.R
+import com.agupta07505.smartisland.ui.glance.GlanceStudio
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
@@ -1223,6 +1224,8 @@ private fun EmptyExpanded(
     onAppAction: (String, AppShortcutAction) -> Unit
 ) {
     val context = LocalContext.current
+    // Glance is an optional empty-launcher destination, never a replacement for native apps.
+    var showingGlance by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1230,6 +1233,24 @@ private fun EmptyExpanded(
             .padding(start = 18.dp, top = 16.dp, end = 18.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.Center
     ) {
+        if (showingGlance) {
+            Text(
+                text = "Apps",
+                color = LocalIslandPalette.current.accentCyan,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .padding(bottom = 8.dp)
+                    .clickable { showingGlance = false }
+            )
+            // The empty overlay is capped at 260 dp. Keep this scrollable viewport finite,
+            // leaving room for the Apps link and outer padding even under unbounded measurement.
+            GlanceStudio(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 196.dp),
+                allowPermissionRequest = false
+            )
+            return@Column
+        }
         val loadedApps = apps
         if (loadedApps == null) {
             // Keep the configured launcher visually clean while PackageManager and
@@ -1342,6 +1363,15 @@ private fun EmptyExpanded(
                     LauncherPage.Utilities -> UtilitiesContainer(settings)
                 }
             }
+            Text(
+                text = "Glance",
+                color = LocalIslandPalette.current.accentCyan,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .clickable { showingGlance = true }
+            )
         }
     }
 }

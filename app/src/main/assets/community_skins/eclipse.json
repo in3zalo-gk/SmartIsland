@@ -1,0 +1,1 @@
+{"version":1,"id":"eclipse","name":"Eclipse","author":"Smart Island project","license":"GPL-3.0-or-later","baseStyle":"eclipse","states":{"idle":{"colors":["#07070A","#536B94","#9CB7D8"],"animation":{"type":"orbit","speed":0.45}}}}

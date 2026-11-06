@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dashboard_overview">Overview</string>
+    <string name="dashboard_total_notifications">Total notifications</string>
+    <string name="dashboard_opened_tapped">Opened / tapped</string>
+    <string name="dashboard_dismissed">Dismissed</string>
+    <string name="dashboard_engagement_rate">Engagement rate</string>
+    <string name="dashboard_dismissal_rate">Dismissal rate</string>
+    <string name="dashboard_top_apps">Top apps</string>
+    <string name="dashboard_insights">Insights</string>
+    <string name="dashboard_days_active">Days active</string>
+    <string name="dashboard_average_notifications_per_day">Avg. notifications / day</string>
+    <string name="dashboard_reset_statistics">Reset statistics</string>
+    <string name="dashboard_reset_content_description">Reset all notification statistics</string>
+    <string name="dashboard_reset_confirmation_title">Reset statistics?</string>
+    <string name="dashboard_reset_confirmation_message">This permanently clears notification totals and the app ranking on this device.</string>
+    <string name="dashboard_reset">Reset</string>
+    <string name="dashboard_cancel">Cancel</string>
+    <string name="dashboard_no_app_activity_content_description">No app activity recorded yet</string>
+    <string name="dashboard_no_activity_yet">No activity yet</string>
+    <string name="dashboard_no_activity_message">Apps will appear here after their notifications are received.</string>
+    <string name="dashboard_unknown_app">Unknown app</string>
+    <string name="dashboard_percentage">%1$d%%</string>
+    <string name="dashboard_rate_progress_description">%1$s: %2$d%%</string>
+    <string name="dashboard_app_rank_description">Rank %1$d: %2$s, %3$d notifications</string>
+</resources>

@@ -152,6 +152,7 @@ import com.agupta07505.smartisland.ui.sections.IdleWidgetsSettingsSection
 import com.agupta07505.smartisland.ui.sections.WeatherSettingsCard
 import com.agupta07505.smartisland.ui.sections.NetSpeedSettingsCard
 import com.agupta07505.smartisland.ui.sections.CalendarSettingsCard
+import com.agupta07505.smartisland.ui.sections.CommunitySkinsSection
 import com.agupta07505.smartisland.ui.search.searchAnchor
 import com.agupta07505.smartisland.ui.sections.AboutSection
 import com.agupta07505.smartisland.ui.sections.BackupRestoreSection
@@ -163,6 +164,8 @@ import com.agupta07505.smartisland.ui.sections.GesturesSection
 import com.agupta07505.smartisland.ui.sections.NotificationHistorySection
 import com.agupta07505.smartisland.ui.sections.NotificationsAndPrivacySection
 import com.agupta07505.smartisland.ui.sections.PermissionsSection
+import com.agupta07505.smartisland.ui.sections.PetSection
+import com.agupta07505.smartisland.ui.glance.GlanceStudio
 import com.agupta07505.smartisland.ui.sections.PositionsSection
 import com.agupta07505.smartisland.util.SystemServiceRecovery
 import com.agupta07505.smartisland.util.runCatchingLogged
@@ -205,7 +208,9 @@ internal enum class FeatureDetailSection {
     FaceIdSettings,
     WeatherSettings,
     NetSpeedSettings,
-    CalendarSettings
+    CalendarSettings,
+    PetSettings,
+    GlanceStudio
 }
 
 private val IDLE_SETTINGS_PAGES = setOf(
@@ -336,6 +341,7 @@ fun SmartIslandHomeScreen(
     }
 
     var selectedTab by rememberSaveable { mutableStateOf(StudioTab.Studio) }
+    var communitySelected by rememberSaveable { mutableStateOf(false) }
     var orientationTab by rememberSaveable { mutableStateOf(OrientationTab.Portrait) }
     var activeDetailSection by rememberSaveable { mutableStateOf<FeatureDetailSection?>(null) }
     var transitionDirection by rememberSaveable { mutableIntStateOf(1) }
@@ -365,6 +371,7 @@ fun SmartIslandHomeScreen(
             is SearchTarget.Tab -> {
                 transitionDirection = if (target.tab.ordinal > selectedTab.ordinal) 1 else -1
                 selectedTab = target.tab
+                communitySelected = false
                 target.landscape?.let {
                     orientationTab = if (it) OrientationTab.Landscape else OrientationTab.Portrait
                 }
@@ -390,10 +397,14 @@ fun SmartIslandHomeScreen(
         }
     }
 
-    BackHandler(enabled = activeDetailSection != null) {
+    BackHandler(enabled = activeDetailSection != null || communitySelected) {
         transitionDirection = -1
-        // The weather page is opened from the Idle widgets page, so back goes there; every other page goes home.
-        activeDetailSection = if (activeDetailSection in IDLE_SETTINGS_PAGES) FeatureDetailSection.IdleWidgets else null
+        if (activeDetailSection != null) {
+            // The weather page is opened from the Idle widgets page, so back goes there.
+            activeDetailSection = if (activeDetailSection in IDLE_SETTINGS_PAGES) FeatureDetailSection.IdleWidgets else null
+        } else {
+            communitySelected = false
+        }
     }
 
     CompositionLocalProvider(LocalSearchFocus provides searchFocus) {
@@ -406,6 +417,12 @@ fun SmartIslandHomeScreen(
                     onTabSelected = { tab ->
                         transitionDirection = if (tab.ordinal > selectedTab.ordinal) 1 else -1
                         selectedTab = tab
+                        communitySelected = false
+                    },
+                    communitySelected = communitySelected,
+                    onCommunitySelected = {
+                        transitionDirection = 1
+                        communitySelected = true
                     }
                 )
             }
@@ -427,7 +444,9 @@ fun SmartIslandHomeScreen(
         ) { detailSection ->
             Box(Modifier.fillMaxSize()) {
             ThemedBackdrop()
-            if (detailSection == null) {
+            if (detailSection == null && communitySelected) {
+                CommunitySkinsSection(settings = settings, repository = resolvedRepository)
+            } else if (detailSection == null) {
                 val screenWidthDp = LocalConfiguration.current.screenWidthDp
                 val horizontalPad = contentSidePadding(screenWidthDp)
                 Column(
@@ -461,9 +480,7 @@ fun SmartIslandHomeScreen(
                                 notificationGranted = notificationGranted,
                                 batteryIgnored = batteryIgnored,
                                 onCheckedChange = { turnOn ->
-                                    if (turnOn) {
-                                        SystemServiceRecovery.requestRecovery(context)
-                                    }
+                                    if (turnOn) SystemServiceRecovery.requestRecovery(context)
                                     scope.launch { resolvedRepository.setEnabled(turnOn) }
                                 },
                                 onSetupPermissionsClick = {
@@ -471,70 +488,81 @@ fun SmartIslandHomeScreen(
                                     activeDetailSection = FeatureDetailSection.PermissionsCenter
                                 }
                             )
-
-                            // Portrait / Landscape switch, then event toggles for that profile
-                            OrientationTabs(
-                                selected = orientationTab,
-                                onSelected = { orientationTab = it }
-                            )
-                            EventTogglesSection(
-                                settings = settings,
-                                repository = resolvedRepository,
-                                landscape = orientationTab == OrientationTab.Landscape,
-                                onOpenFaceIdSettings = {
-                                    transitionDirection = 1
-                                    activeDetailSection = FeatureDetailSection.FaceIdSettings
-                                }
-                            )
+                            SettingsCategoryGroup(title = stringResource(R.string.nav_group_events)) {
+                                OrientationTabs(selected = orientationTab, onSelected = { orientationTab = it })
+                                EventTogglesSection(
+                                    settings = settings,
+                                    repository = resolvedRepository,
+                                    landscape = orientationTab == OrientationTab.Landscape,
+                                    onOpenFaceIdSettings = {
+                                        transitionDirection = 1
+                                        activeDetailSection = FeatureDetailSection.FaceIdSettings
+                                    }
+                                )
+                            }
+                            PrincipalFeaturesSection(settings = settings, onNavigateTo = {
+                                transitionDirection = 1
+                                activeDetailSection = it
+                            })
+                            SettingsCategoryGroup(title = stringResource(R.string.nav_group_demo)) {
+                                DemoSection(settings = settings, notificationRepository = resolvedNotificationRepository)
+                            }
                         }
 
                         StudioTab.Position -> {
-                            OrientationTabs(
-                                selected = orientationTab,
-                                onSelected = { orientationTab = it }
-                            )
-                            run {
-                                if (orientationTab == OrientationTab.Landscape) {
-                                    LandscapeSection(
-                                        settings = settings,
-                                        repository = resolvedRepository
-                                    )
-                                } else {
-                                    PositionsSection(
-                                        settings = settings,
-                                        repository = resolvedRepository,
-                                        onNavigateToBackup = {
-                                            transitionDirection = 1
-                                            activeDetailSection = FeatureDetailSection.BackupRestore
-                                        }
-                                    )
+                            SettingsCategoryGroup(title = stringResource(R.string.nav_group_visual)) {
+                                ThemeModeSelector(selected = settings.themeMode, onSelected = { mode ->
+                                    scope.launch { resolvedRepository.setThemeMode(mode) }
+                                })
+                                com.agupta07505.smartisland.ui.sections.AppThemeOptions(
+                                    settings = settings,
+                                    onLiquidGlassChange = { on -> scope.launch { resolvedRepository.setLiquidGlassTheme(on) } },
+                                    onMaterialYouChange = { on -> scope.launch { resolvedRepository.setMaterialYou(on) } },
+                                    onAccentChange = { argb -> scope.launch { resolvedRepository.setAccentColor(argb) } }
+                                )
+                                FeatureStudioNavigationCard(
+                                    title = stringResource(R.string.card_color_studio_title),
+                                    subtitle = stringResource(R.string.nav_color_studio_subtitle),
+                                    icon = Icons.Rounded.Palette,
+                                    iconColor = BadgeViolet,
+                                    statusText = stringResource(R.string.card_color_studio_status, (settings.opacity * 100).toInt()),
+                                    onClick = { transitionDirection = 1; activeDetailSection = FeatureDetailSection.ColorStudio }
+                                )
+                                CollapsibleCard(
+                                    title = stringResource(R.string.island_font_title),
+                                    stateKey = "layout_appearance_fonts",
+                                    summary = stringResource(R.string.nav_font_summary),
+                                    icon = Icons.Rounded.FontDownload,
+                                    initiallyExpanded = false
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        IslandFontPicker(selected = settings.islandFont, onSelected = { font -> scope.launch { resolvedRepository.setIslandFont(font) } })
+                                        com.agupta07505.smartisland.ui.sections.IslandFontMixSection(settings = settings, onChange = { enabled, light, regular, medium ->
+                                            scope.launch { resolvedRepository.setFontMix(enabled, light, regular, medium) }
+                                        })
+                                    }
                                 }
                             }
-                            AnimationSpeedSection(
-                                settings = settings,
-                                repository = resolvedRepository,
-                                landscape = orientationTab == OrientationTab.Landscape
-                            )
-                            MergeStyleSection(
-                                settings = settings,
-                                repository = resolvedRepository,
-                                landscape = orientationTab == OrientationTab.Landscape
-                            )
-                            IdleWidgetsSection(
-                                settings = settings,
-                                repository = resolvedRepository,
-                                onOpenSettings = {
-                                    transitionDirection = 1
-                                    activeDetailSection = FeatureDetailSection.IdleWidgets
+                            SettingsCategoryGroup(title = stringResource(R.string.nav_group_layout)) {
+                                OrientationTabs(selected = orientationTab, onSelected = { orientationTab = it })
+                                if (orientationTab == OrientationTab.Landscape) {
+                                    LandscapeSection(settings = settings, repository = resolvedRepository)
+                                } else {
+                                    PositionsSection(settings = settings, repository = resolvedRepository, onNavigateToBackup = {
+                                        transitionDirection = 1; activeDetailSection = FeatureDetailSection.BackupRestore
+                                    })
                                 }
-                            )
-                        }
-
-                        StudioTab.Demo -> {
-                            DemoSection(
-                                settings = settings,
-                                notificationRepository = resolvedNotificationRepository
-                            )
+                                AnimationSpeedSection(settings = settings, repository = resolvedRepository, landscape = orientationTab == OrientationTab.Landscape)
+                                MergeStyleSection(settings = settings, repository = resolvedRepository, landscape = orientationTab == OrientationTab.Landscape)
+                                IdleWidgetsSection(
+                                    settings = settings,
+                                    repository = resolvedRepository,
+                                    onOpenSettings = {
+                                        transitionDirection = 1
+                                        activeDetailSection = FeatureDetailSection.IdleWidgets
+                                    }
+                                )
+                            }
                         }
 
                         StudioTab.Settings -> {
@@ -547,26 +575,13 @@ fun SmartIslandHomeScreen(
                                 overlayGranted = overlayGranted,
                                 notificationGranted = notificationGranted,
                                 batteryIgnored = batteryIgnored,
-                                onThemeModeChange = { mode ->
-                                    scope.launch { resolvedRepository.setThemeMode(mode) }
-                                },
-                                onLiquidGlassChange = { on -> scope.launch { resolvedRepository.setLiquidGlassTheme(on) } },
-                                onMaterialYouChange = { on -> scope.launch { resolvedRepository.setMaterialYou(on) } },
-                                onAccentChange = { argb -> scope.launch { resolvedRepository.setAccentColor(argb) } },
-                                onIslandFontChange = { font ->
-                                    scope.launch { resolvedRepository.setIslandFont(font) }
-                                },
-                                onFontMixChange = { enabled, light, regular, medium ->
-                                    scope.launch { resolvedRepository.setFontMix(enabled, light, regular, medium) }
-                                },
-                                onNavigateTo = { section ->
-                                    transitionDirection = 1
-                                    activeDetailSection = section
-                                }
+                                onNavigateTo = { section -> transitionDirection = 1; activeDetailSection = section }
                             )
                         }
-                    }
 
+
+                        StudioTab.Demo -> DemoSection(settings = settings, notificationRepository = resolvedNotificationRepository)
+                    }
                 }
             } else {
                 DetailScreenHost(
@@ -748,7 +763,7 @@ private fun MasterPowerCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -800,7 +815,7 @@ private fun MasterPowerCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = onSetupPermissionsClick)
-                    .background(Color(0xFFE88C25).copy(alpha = 0.08f))
+                    .background(MaterialTheme.colorScheme.tertiaryContainer)
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -811,12 +826,12 @@ private fun MasterPowerCard(
                     Icon(
                         Icons.Rounded.Warning,
                         contentDescription = null,
-                        tint = Color(0xFFE88C25),
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
                         text = stringResource(R.string.btn_grant_required_permissions),
-                        color = Color(0xFFE88C25),
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -883,6 +898,52 @@ private fun SetupChip(label: String, granted: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
+private fun PrincipalFeaturesSection(
+    settings: SmartIslandSettings,
+    onNavigateTo: (FeatureDetailSection) -> Unit
+) {
+    SettingsCategoryGroup(title = stringResource(R.string.nav_group_features)) {
+        FeatureStudioNavigationCard(
+            title = stringResource(R.string.card_notifications_privacy_title), subtitle = stringResource(R.string.nav_notifications_subtitle),
+            icon = Icons.Rounded.Notifications, statusText = if (settings.showOnLockScreen) stringResource(R.string.card_notifications_privacy_status_lock) else null,
+            onClick = { onNavigateTo(FeatureDetailSection.NotificationRules) }
+        )
+        FeatureStudioNavigationCard(
+            title = stringResource(R.string.card_notification_history_title), subtitle = stringResource(R.string.nav_history_subtitle),
+            icon = Icons.Rounded.History, iconColor = BadgeIndigo, statusText = if (settings.enableNotificationHistory) stringResource(R.string.card_notification_history_status_active) else null,
+            onClick = { onNavigateTo(FeatureDetailSection.NotificationHistory) }
+        )
+        FeatureStudioNavigationCard(
+            title = stringResource(R.string.card_app_shortcuts_title), subtitle = stringResource(R.string.nav_shortcuts_subtitle),
+            icon = Icons.Rounded.Apps, iconColor = BadgeTeal, statusText = if (settings.enableAppShortcuts) stringResource(R.string.card_app_shortcuts_status, settings.shortcutPackages.size) else null,
+            onClick = { onNavigateTo(FeatureDetailSection.AppShortcuts) }
+        )
+        FeatureStudioNavigationCard(
+            title = stringResource(R.string.card_gestures_guide_title), subtitle = stringResource(R.string.nav_gestures_subtitle),
+            icon = Icons.Rounded.Gesture, iconColor = BadgePink, onClick = { onNavigateTo(FeatureDetailSection.GesturesGuide) }
+        )
+        FeatureStudioNavigationCard(
+            title = stringResource(R.string.idle_widgets_title), subtitle = stringResource(R.string.nav_idle_subtitle),
+            icon = Icons.Rounded.Widgets, iconColor = BadgeAmber, statusText = if (settings.idleWidgetsEnabled || settings.idleWidgetsEnabledLandscape) stringResource(R.string.status_active) else null,
+            onClick = { onNavigateTo(FeatureDetailSection.IdleWidgets) }
+        )
+        FeatureStudioNavigationCard(
+            title = stringResource(R.string.card_timing_title), subtitle = stringResource(R.string.nav_timing_subtitle),
+            icon = Icons.Rounded.Timer, iconColor = BadgeSky, onClick = { onNavigateTo(FeatureDetailSection.Timing) }
+        )
+        FeatureStudioNavigationCard(
+            title = stringResource(R.string.nav_glance_title), subtitle = stringResource(R.string.nav_glance_subtitle),
+            icon = Icons.Rounded.Palette, iconColor = BadgeViolet, onClick = { onNavigateTo(FeatureDetailSection.GlanceStudio) }
+        )
+        FeatureStudioNavigationCard(
+            title = "Island Pet", subtitle = stringResource(R.string.nav_pet_subtitle),
+            icon = Icons.Rounded.Palette, iconColor = BadgePink, statusText = if (settings.enablePet) stringResource(R.string.status_active) else null,
+            onClick = { onNavigateTo(FeatureDetailSection.PetSettings) }
+        )
+    }
+}
+
+@Composable
 private fun SettingsOverviewSection(
     settings: SmartIslandSettings,
     searchQuery: String,
@@ -892,12 +953,6 @@ private fun SettingsOverviewSection(
     overlayGranted: Boolean,
     notificationGranted: Boolean,
     batteryIgnored: Boolean,
-    onThemeModeChange: (String) -> Unit,
-    onLiquidGlassChange: (Boolean) -> Unit,
-    onMaterialYouChange: (Boolean) -> Unit,
-    onAccentChange: (Long) -> Unit,
-    onIslandFontChange: (String) -> Unit,
-    onFontMixChange: (Boolean, String, String, String) -> Unit,
     onNavigateTo: (FeatureDetailSection) -> Unit
 ) {
     val canEnable = overlayGranted && notificationGranted
@@ -964,105 +1019,7 @@ private fun SettingsOverviewSection(
         if (searchQuery.isNotBlank()) {
             SettingsSearchResults(query = searchQuery, results = searchResults, onPick = onSearchPick)
         } else {
-            // Appearance: the app's own theme, then the island's colours. (Position, size, shadow and the
-            // animation choices are on the Layout tab.)
-            SettingsCategoryGroup(title = stringResource(R.string.category_appearance_controls)) {
-                ThemeModeSelector(selected = settings.themeMode, onSelected = onThemeModeChange)
-
-                com.agupta07505.smartisland.ui.sections.AppThemeOptions(
-                    settings = settings,
-                    onLiquidGlassChange = onLiquidGlassChange,
-                    onMaterialYouChange = onMaterialYouChange,
-                    onAccentChange = onAccentChange
-                )
-
-                FeatureStudioNavigationCard(
-                    title = stringResource(R.string.card_color_studio_title),
-                    subtitle = "Colours, opacity, gradients and card styles",
-                    icon = Icons.Rounded.Palette,
-                    iconColor = BadgeViolet,
-                    statusText = stringResource(R.string.card_color_studio_status, (settings.opacity * 100).toInt()),
-                    onClick = { onNavigateTo(FeatureDetailSection.ColorStudio) }
-                )
-
-                CollapsibleCard(
-                    title = stringResource(R.string.island_font_title),
-                    stateKey = "settings_appearance_fonts",
-                    summary = "Typography and font mixing",
-                    icon = Icons.Rounded.FontDownload,
-                    initiallyExpanded = false
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IslandFontPicker(selected = settings.islandFont, onSelected = onIslandFontChange)
-                        com.agupta07505.smartisland.ui.sections.IslandFontMixSection(settings = settings, onChange = onFontMixChange)
-                    }
-                }
-            }
-
-            // Features: what shows on the island and which apps may use it.
-            SettingsCategoryGroup(title = stringResource(R.string.category_behaviors_launcher)) {
-                FeatureStudioNavigationCard(
-                    title = stringResource(R.string.card_notifications_privacy_title),
-                    subtitle = "Which apps and events show, lock screen privacy",
-                    icon = Icons.Rounded.Notifications,
-                    statusText = if (settings.showOnLockScreen) stringResource(R.string.card_notifications_privacy_status_lock) else null,
-                    onClick = { onNavigateTo(FeatureDetailSection.NotificationRules) }
-                )
-
-                FeatureStudioNavigationCard(
-                    title = stringResource(R.string.card_notification_history_title),
-                    subtitle = "Browse notifications the island has shown",
-                    icon = Icons.Rounded.History,
-                    iconColor = BadgeIndigo,
-                    statusText = if (settings.enableNotificationHistory) stringResource(R.string.card_notification_history_status_active) else null,
-                    statusColor = if (settings.enableNotificationHistory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    onClick = { onNavigateTo(FeatureDetailSection.NotificationHistory) }
-                )
-
-                FeatureStudioNavigationCard(
-                    title = stringResource(R.string.card_app_shortcuts_title),
-                    subtitle = "Launch favourite apps from the island",
-                    icon = Icons.Rounded.Apps,
-                    iconColor = BadgeTeal,
-                    statusText = if (settings.enableAppShortcuts) {
-                        stringResource(R.string.card_app_shortcuts_status, settings.shortcutPackages.size)
-                    } else null,
-                    statusColor = if (settings.enableAppShortcuts) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    onClick = { onNavigateTo(FeatureDetailSection.AppShortcuts) }
-                )
-            }
-
-            // Interaction: how the island answers your hands, and how long things stay.
-            SettingsCategoryGroup(title = stringResource(R.string.category_interaction)) {
-                FeatureStudioNavigationCard(
-                    title = stringResource(R.string.card_gestures_guide_title),
-                    subtitle = "Swipes, taps, long press, sensitivity and vibration",
-                    icon = Icons.Rounded.Gesture,
-                    iconColor = BadgePink,
-                    onClick = { onNavigateTo(FeatureDetailSection.GesturesGuide) }
-                )
-
-                FeatureStudioNavigationCard(
-                    title = stringResource(R.string.idle_widgets_title),
-                    subtitle = stringResource(R.string.card_idle_widgets_subtitle),
-                    icon = Icons.Rounded.Widgets,
-                    iconColor = BadgeAmber,
-                    statusText = if (settings.idleWidgetsEnabled || settings.idleWidgetsEnabledLandscape) {
-                        stringResource(R.string.status_active)
-                    } else null,
-                    statusColor = MaterialTheme.colorScheme.primary,
-                    onClick = { onNavigateTo(FeatureDetailSection.IdleWidgets) }
-                )
-
-                FeatureStudioNavigationCard(
-                    title = stringResource(R.string.card_timing_title),
-                    subtitle = stringResource(R.string.card_timing_subtitle),
-                    icon = Icons.Rounded.Timer,
-                    iconColor = BadgeSky,
-                    onClick = { onNavigateTo(FeatureDetailSection.Timing) }
-                )
-            }
-
+            // Configurações contém apenas controles do aplicativo e manutenção.
             // System: permissions, backup, developer options, about.
             SystemGroup()
         }
@@ -1175,7 +1132,9 @@ private fun FeatureStudioNavigationCard(
 @Composable
 private fun StudioBottomNavigationBar(
     selectedTab: StudioTab,
-    onTabSelected: (StudioTab) -> Unit
+    onTabSelected: (StudioTab) -> Unit,
+    communitySelected: Boolean,
+    onCommunitySelected: () -> Unit
 ) {
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -1184,8 +1143,8 @@ private fun StudioBottomNavigationBar(
         NavigationBarItem(
             selected = selectedTab == StudioTab.Studio,
             onClick = { onTabSelected(StudioTab.Studio) },
-            icon = { Icon(Icons.Rounded.FlashOn, contentDescription = stringResource(R.string.tab_studio)) },
-            label = { Text(stringResource(R.string.tab_studio), fontWeight = FontWeight.SemiBold) },
+            icon = { Icon(Icons.Rounded.FlashOn, contentDescription = stringResource(R.string.tab_principal)) },
+            label = { Text(stringResource(R.string.tab_principal), fontWeight = FontWeight.SemiBold) },
             colors = NavigationBarItemDefaults.colors(
                 indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                 selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -1195,19 +1154,8 @@ private fun StudioBottomNavigationBar(
         NavigationBarItem(
             selected = selectedTab == StudioTab.Position,
             onClick = { onTabSelected(StudioTab.Position) },
-            icon = { Icon(Icons.Rounded.Tune, contentDescription = stringResource(R.string.tab_position)) },
-            label = { Text(stringResource(R.string.tab_position), fontWeight = FontWeight.SemiBold) },
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                selectedIconColor = MaterialTheme.colorScheme.primary,
-                selectedTextColor = MaterialTheme.colorScheme.primary
-            )
-        )
-        NavigationBarItem(
-            selected = selectedTab == StudioTab.Demo,
-            onClick = { onTabSelected(StudioTab.Demo) },
-            icon = { Icon(Icons.Rounded.Science, contentDescription = stringResource(R.string.tab_demo)) },
-            label = { Text(stringResource(R.string.tab_demo), fontWeight = FontWeight.SemiBold) },
+            icon = { Icon(Icons.Rounded.Tune, contentDescription = stringResource(R.string.tab_layout)) },
+            label = { Text(stringResource(R.string.tab_layout), fontWeight = FontWeight.SemiBold) },
             colors = NavigationBarItemDefaults.colors(
                 indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                 selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -1219,6 +1167,17 @@ private fun StudioBottomNavigationBar(
             onClick = { onTabSelected(StudioTab.Settings) },
             icon = { Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.tab_settings)) },
             label = { Text(stringResource(R.string.tab_settings), fontWeight = FontWeight.SemiBold) },
+            colors = NavigationBarItemDefaults.colors(
+                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary
+            )
+        )
+        NavigationBarItem(
+            selected = communitySelected,
+            onClick = onCommunitySelected,
+            icon = { Icon(Icons.Rounded.Palette, contentDescription = stringResource(R.string.tab_community)) },
+            label = { Text(stringResource(R.string.tab_community), fontWeight = FontWeight.SemiBold) },
             colors = NavigationBarItemDefaults.colors(
                 indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                 selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -1303,6 +1262,8 @@ private fun DetailScreenHost(
                 FeatureDetailSection.WeatherSettings -> stringResource(R.string.weather_cfg_title)
                 FeatureDetailSection.NetSpeedSettings -> stringResource(R.string.net_cfg_title)
                 FeatureDetailSection.CalendarSettings -> stringResource(R.string.cal_cfg_title)
+                FeatureDetailSection.PetSettings -> "Island Pet"
+                FeatureDetailSection.GlanceStudio -> "Glance · resumo e rotinas"
             }
             Text(
                 text = title,
@@ -1410,6 +1371,8 @@ private fun DetailScreenHost(
             FeatureDetailSection.CalendarSettings -> {
                 CalendarSettingsCard(modifier = Modifier.searchAnchor("idle.calendar"))
             }
+            FeatureDetailSection.PetSettings -> PetSection(settings = settings, repository = repository)
+            FeatureDetailSection.GlanceStudio -> GlanceStudio(modifier = Modifier.weight(1f))
         }
     }
 }

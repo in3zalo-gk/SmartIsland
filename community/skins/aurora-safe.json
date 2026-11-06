@@ -1,0 +1,1 @@
+{"version":1,"id":"aurora-safe","name":"Aurora segura","author":"Comunidade","license":"CC-BY-4.0","baseStyle":"obsidian","states":{"idle":{"colors":["#10243D","#36D1DC"],"animation":{"type":"flow","speed":1}},"music":{"colors":["#6D5DFB","#36D1DC"],"animation":{"type":"pulse","speed":1.2}}}}

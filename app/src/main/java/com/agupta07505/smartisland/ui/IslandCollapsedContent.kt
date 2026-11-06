@@ -1064,7 +1064,7 @@ internal fun StopwatchTimer(notification: IslandNotification?, color: Color) {
             frozenElapsedSeconds,
             chronometerBase
         ) {
-            mutableStateOf(
+            mutableLongStateOf(
                 frozenElapsedSeconds
                     ?: chronometerBase?.let { base ->
                         (

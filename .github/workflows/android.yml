@@ -1,0 +1,79 @@
+# Smart Island (2026)
+# Copyright Animesh Gupta — github.com/agupta07505
+# Licensed under the GNU GPL v3 License
+
+name: Build Android APK
+
+on:
+  push:
+    branches: [improve/pet-motion-root]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Isolated verification only. This branch cannot build or publish a release.
+jobs:
+  verify:
+    name: Lint, unit tests and debug build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - name: Run lint, unit tests and debug build
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon --stacktrace lintDebug testDebugUnitTest assembleDebug
+      - name: Preserve unit-test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            app/build/test-results/testDebugUnitTest/*.xml
+            app/build/reports/tests/testDebugUnitTest/**
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve lint reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          path: app/build/reports/lint-results-*.html
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Preserve debug APK for manual testing
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Summarize actual test results
+        if: ${{ !cancelled() }}
+        shell: python
+        run: |
+          import glob, os, xml.etree.ElementTree as ET
+          files = glob.glob("app/build/test-results/testDebugUnitTest/*.xml")
+          if not files:
+              raise SystemExit("No JUnit XML reports were produced")
+          totals = dict.fromkeys(["tests", "failures", "errors", "skipped"], 0)
+          lines = []
+          for path in sorted(files):
+              root = ET.parse(path).getroot()
+              for key in totals:
+                  totals[key] += int(root.get(key, 0))
+              lines.append(root.get("name", path) + ": " + root.get("tests", "0") + " tests, " + root.get("failures", "0") + " failures")
+          summary = "JUnit totals: " + ", ".join(f"{k}={v}" for k, v in totals.items())
+          print(summary)
+          print("\n".join(lines))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+              out.write(summary + "\n\n" + "\n".join("- " + line for line in lines) + "\n")
+          if totals["tests"] == 0 or totals["failures"] or totals["errors"]:
+              raise SystemExit("Unit tests did not pass")

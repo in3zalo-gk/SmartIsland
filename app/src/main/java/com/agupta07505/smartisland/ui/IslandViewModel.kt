@@ -22,14 +22,20 @@ import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.data.SmartIslandSettingsRepository
 import com.agupta07505.smartisland.model.IslandEvent
 import com.agupta07505.smartisland.model.IslandMode
+import com.agupta07505.smartisland.model.IslandPetState
 import com.agupta07505.smartisland.model.IslandPriority
 import com.agupta07505.smartisland.model.IslandNotification
+import com.agupta07505.smartisland.model.PetMood
+import com.agupta07505.smartisland.model.PetScreenBounds
+import com.agupta07505.smartisland.model.PetScreenPosition
+import com.agupta07505.smartisland.model.afterReaction
 import com.agupta07505.smartisland.model.appGroupKey
 import com.agupta07505.smartisland.model.landscapeWidgetPillWanted
 import com.agupta07505.smartisland.model.pillOnIsland
 import com.agupta07505.smartisland.model.nextAppGroupIndex
 import com.agupta07505.smartisland.model.nextSiblingIndex
 import com.agupta07505.smartisland.model.siblingIndices
+import com.agupta07505.smartisland.model.transientDurationMillis
 import com.agupta07505.smartisland.util.AppEventRules
 import com.agupta07505.smartisland.util.ExpandedSelection
 import com.agupta07505.smartisland.util.IslandTimings
@@ -678,6 +684,10 @@ class IslandViewModel(
     /** True while the island is open because an event opened it by itself and the user has not touched it yet. */
     val autoExpanded = MutableStateFlow(false)
 
+    val petState = MutableStateFlow(IslandPetState())
+    /** Position is in physical screen pixels, not coordinates local to the pill. */
+    val petPosition = MutableStateFlow(PetScreenPosition())
+
     fun markUserEngaged() {
         if (autoExpanded.value) autoExpanded.value = false
     }
@@ -696,6 +706,9 @@ class IslandViewModel(
     private var autoCollapseJob: Job? = null
     private var popupJob: Job? = null
     private var switchJob: Job? = null
+    private var activePetMood = PetMood.Idle
+    private var petDragInProgress = false
+    private var petScreenBounds = PetScreenBounds(width = 0f, height = 0f, petSize = 0f)
 
     private val autoCollapsePaused = MutableStateFlow(false)
 
@@ -1179,6 +1192,62 @@ class IslandViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            runSuspendCatchingLogged(TAG, "Pet-mood auto-revert failed") {
+                petState.collectLatest { state ->
+                    val duration = state.mood.transientDurationMillis ?: return@collectLatest
+                    delay(duration)
+                    // Never clear a newer reaction with an older timer.
+                    if (petState.value === state) {
+                        petState.value = IslandPetState(mood = activePetMood.afterReaction())
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            runSuspendCatchingLogged(TAG, "Pet-mode-reaction collector failed") {
+                combine(visibleNotifications, selectedIndex, settings) { list, index, config ->
+                    if (!config.enablePet) return@combine PetMood.Idle
+                    val notification = list.getOrNull(index)
+                    when (notification?.mode ?: IslandMode.Empty) {
+                        IslandMode.Battery -> {
+                            val title = notification?.title.orEmpty().lowercase(java.util.Locale.ROOT)
+                            if (title.contains("low") || title.contains("baixa")) PetMood.LowBattery else PetMood.Charging
+                        }
+                        IslandMode.Bluetooth -> PetMood.BluetoothConnected
+                        IslandMode.Music -> PetMood.Music
+                        IslandMode.IncomingCall -> PetMood.Calling
+                        IslandMode.DownloadUpload -> PetMood.Installing
+                        IslandMode.Hotspot -> PetMood.Hotspot
+                        IslandMode.Flashlight -> PetMood.Flashlight
+                        IslandMode.Empty -> PetMood.Idle
+                        else -> PetMood.Happy
+                    }
+                }.collect { petMood ->
+                    activePetMood = petMood
+                    val important = isPriorityMood(petMood)
+                    when {
+                        !settings.value.enablePet -> {
+                            if (petState.value.mood != PetMood.Idle) petState.value = IslandPetState(mood = PetMood.Idle)
+                        }
+                        // A newly active call/low-battery warning always interrupts a drag.
+                        important -> {
+                            if (petState.value.mood != petMood) petState.value = IslandPetState(mood = petMood)
+                        }
+                        // If that priority state ends before the finger is released, resume the
+                        // pointer-owned state; release then restores the newest active activity.
+                        petDragInProgress -> {
+                            if (petState.value.mood != PetMood.Dragging) {
+                                petState.value = IslandPetState(mood = PetMood.Dragging)
+                            }
+                        }
+                        petState.value.mood != PetMood.Tapped && petState.value.mood != PetMood.Dragging -> {
+                            if (petState.value.mood != petMood) petState.value = IslandPetState(mood = petMood)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private enum class ResumeState { NONE, GONE, WAIT, READY }
@@ -1318,6 +1387,62 @@ class IslandViewModel(
             startAutoCollapseTimer()
         }
     }
+
+    fun setPetMood(mood: PetMood) {
+        // Calls and low-battery warnings remain visible above friendly reactions.
+        if (isPriorityMood(petState.value.mood) && mood != petState.value.mood) return
+        // A pointer-owned drag cannot be replaced by a tap/reaction timer while held.
+        if (petDragInProgress && !isPriorityMood(mood)) return
+        petState.value = IslandPetState(mood = mood, moodTimestamp = System.currentTimeMillis())
+    }
+
+    /** Pointer-owned gesture state: no timeout can end a drag while it is still held. */
+    fun startPetDrag() {
+        petDragInProgress = true
+        if (!isPriorityMood(petState.value.mood)) {
+            petState.value = IslandPetState(mood = PetMood.Dragging)
+        }
+    }
+
+    /**
+     * Called by the full-screen pet layer after measure. Existing positions survive recomposition
+     * and rotation, then clamp to the currently usable physical screen.
+     */
+    fun setPetScreenBounds(width: Float, height: Float, petSize: Float) {
+        val next = PetScreenBounds(width, height, petSize)
+        if (next == petScreenBounds) return
+        petScreenBounds = next
+        if (next.isUsable) {
+            val clamped = next.clamp(petPosition.value)
+            if (clamped != petPosition.value) petPosition.value = clamped
+        }
+    }
+
+    /** Moves in screen pixels, rather than the clipped coordinates of the pill composable. */
+    fun dragPetBy(deltaX: Float, deltaY: Float) {
+        if (!petDragInProgress && (deltaX != 0f || deltaY != 0f)) startPetDrag()
+        if (!petScreenBounds.isUsable || (deltaX == 0f && deltaY == 0f)) return
+        val current = petScreenBounds.clamp(petPosition.value)
+        val moved = petScreenBounds.clamp(
+            PetScreenPosition(x = current.x + deltaX, y = current.y + deltaY)
+        )
+        if (moved != petPosition.value) petPosition.value = moved
+    }
+
+    fun endPetDrag() = finishPetDrag()
+
+    fun cancelPetDrag() = finishPetDrag()
+
+    private fun finishPetDrag() {
+        if (!petDragInProgress) return
+        petDragInProgress = false
+        if (petState.value.mood == PetMood.Dragging) {
+            petState.value = IslandPetState(mood = activePetMood.afterReaction())
+        }
+    }
+
+    private fun isPriorityMood(mood: PetMood) =
+        mood == PetMood.Calling || mood == PetMood.LowBattery
 
     fun setSelectedNotificationIndex(index: Int) {
         val list = visibleNotifications.value

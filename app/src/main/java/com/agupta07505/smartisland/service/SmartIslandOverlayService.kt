@@ -39,6 +39,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.agupta07505.smartisland.MainActivity
 import com.agupta07505.smartisland.R
 import com.agupta07505.smartisland.data.INotificationRepository
+import com.agupta07505.smartisland.data.NotificationStatsRepository
 import com.agupta07505.smartisland.data.SmartIslandCommand
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.data.SmartIslandSettingsRepository
@@ -72,6 +73,7 @@ class SmartIslandOverlayService : AccessibilityService() {
     private lateinit var windowManager: WindowManager
     @Inject lateinit var repository: SmartIslandSettingsRepository
     @Inject lateinit var notificationRepository: INotificationRepository
+    @Inject lateinit var statsRepository: NotificationStatsRepository
     private var islandView: ComposeView? = null
     private val overlayOwners = OverlayViewTreeOwners()
     private lateinit var systemEventReceiver: SystemEventReceiver
@@ -88,6 +90,10 @@ class SmartIslandOverlayService : AccessibilityService() {
     private var widgetWindowJob: kotlinx.coroutines.Job? = null
     private var collapseJob: kotlinx.coroutines.Job? = null
     private var lastParams: WindowManager.LayoutParams? = null
+    private var petRegionLayoutPending = false
+    /** Set only when WindowManager accepted a screen-rooted full-screen frame. */
+    private val fullWidthIsAvailable = MutableStateFlow(false)
+    private val screenWidthCoordinates = MutableStateFlow(false)
 
     private val torchCallback = object : android.hardware.camera2.CameraManager.TorchCallback() {
         override fun onTorchModeChanged(cameraId: String, enabled: Boolean) {
@@ -1052,6 +1058,23 @@ class SmartIslandOverlayService : AccessibilityService() {
                 }
             }
         }
+
+        // The reflection API recalculates the narrow touch region during layout. Coalesce drag
+        // events to one request per display frame so the pass-through update does not add jank.
+        serviceScope.launch {
+            runSuspendCatchingLogged(TAG, "Pet-position collector failed") {
+                viewModel.petPosition.collectLatest {
+                    val view = islandView ?: return@collectLatest
+                    if (!petRegionLayoutPending) {
+                        petRegionLayoutPending = true
+                        view.postOnAnimation {
+                            petRegionLayoutPending = false
+                            if (!destroyed && view.isAttachedToWindow) view.requestLayout()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     override fun onServiceConnected() {
@@ -1226,7 +1249,7 @@ class SmartIslandOverlayService : AccessibilityService() {
                 isFocusableInTouchMode = true
                 setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
                 setContent {
-                    val fullWidth by isTouchableRegionSupported.collectAsState()
+                    val fullWidth by fullWidthIsAvailable.collectAsState()
                     val fontSettings by viewModel.settings.collectAsState()
                     val islandFont = remember(
                         fontSettings.islandFont, fontSettings.fontMixEnabled,
@@ -1252,7 +1275,8 @@ class SmartIslandOverlayService : AccessibilityService() {
                                 performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
                                 viewModel.collapse()
                             },
-                            isFullWidth = fullWidth
+                            isFullWidth = fullWidth,
+                            allowFloatingPet = fullWidth
                         )
                     }
                     }
@@ -1373,6 +1397,14 @@ class SmartIslandOverlayService : AccessibilityService() {
                         
                         val region = touchableRegionField.get(insets) as android.graphics.Region
                         region.set(left, top, right, bottom)
+                        // An explicitly external pet gets its own hit region; all other screen touches still pass through.
+                        if (settingsVal.enablePet && !settingsVal.petInsideIsland && fullWidthIsAvailable.value) {
+                            val size = (48f * density).toInt()
+                            val position = viewModel.petPosition.value
+                            val petLeft = position.x.toInt().coerceIn(0, (screenWidth - size).coerceAtLeast(0))
+                            val petTop = position.y.toInt().coerceAtLeast(0)
+                            region.union(android.graphics.Rect(petLeft, petTop, petLeft + size, petTop + size))
+                        }
                         // Portrait: a long press on the camera cutout (when the pill's centre band does not reach it)
                         // hides / shows the pill.
                         cutoutTouchRect(settingsVal, isLandscapeNow, bottom)?.let { region.union(it) }
@@ -1416,11 +1448,13 @@ class SmartIslandOverlayService : AccessibilityService() {
                     }
                     override fun onViewDetachedFromWindow(v: android.view.View) {
                         android.util.Log.d(TAG, "onViewDetachedFromWindow called")
+                        fullWidthIsAvailable.value = false
                     }
                 })
             }
         } ?: run {
             isTouchableRegionSupported.value = false
+            fullWidthIsAvailable.value = false
             android.util.Log.w(TAG, "Touchable region reflection unsupported or blocked, falling back to physical bounds")
         }
     }
@@ -1603,10 +1637,12 @@ class SmartIslandOverlayService : AccessibilityService() {
         // While a card is on the island the window is already full height when collapsed (the touchable region keeps every touch
         // outside the pill going to the app below, as it does for the full width). Growing the window on the tap took a frame or
         // two, and the opening card was clipped to the small collapsed window before the jump to its real height.
+        val externalPetWindow = settings.enablePet && !settings.petInsideIsland &&
+            isTouchableRegionSupported.value && !isHidden && !isStatic
         val preGrown = isTouchableRegionSupported.value && visibleCount > 0 && !isHidden && !isStatic
         // the square scan is taller than the collapsed window
         val faceIdState = com.agupta07505.smartisland.util.FaceIdController.state.value
-        val fullWindow = expanded || widgetWindowOpen ||
+        val fullWindow = expanded || widgetWindowOpen || externalPetWindow ||
             (faceIdState.active && faceIdState.style != com.agupta07505.smartisland.util.FaceIdController.Style.Cutout)
         val h = if (fullWindow || preGrown) {
             WindowManager.LayoutParams.MATCH_PARENT
@@ -1637,7 +1673,7 @@ class SmartIslandOverlayService : AccessibilityService() {
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
 
         val currentX = if (fullWindow || isTouchableRegionSupported.value) 0 else windowXPx
-        val currentY = if (settings.enableNotchMode || isLandscape) 0 else settings.yOffset.dpToPx()
+        val currentY = if (externalPetWindow || settings.enableNotchMode || isLandscape) 0 else settings.yOffset.dpToPx()
         val currentSoftInputMode = if (isInput) {
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
                 WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
@@ -1654,6 +1690,7 @@ class SmartIslandOverlayService : AccessibilityService() {
             lp.y == currentY &&
             lp.softInputMode == currentSoftInputMode
         ) {
+            updateFullWidthAvailability()
             return
         }
 
@@ -1672,9 +1709,30 @@ class SmartIslandOverlayService : AccessibilityService() {
                 layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
-        lastParams = params
-        runCatchingLogged(TAG, "Failed to update view layout") { 
-            windowManager.updateViewLayout(view, params) 
+        // Do not publish the new frame until WindowManager has accepted it. Otherwise a failed
+        // layout update could make Compose draw an external pet in an old, offset window.
+        val layoutUpdated = runCatching {
+            windowManager.updateViewLayout(view, params)
+        }.onFailure { error ->
+            android.util.Log.e(TAG, "Failed to update view layout", error)
+        }.isSuccess
+        if (layoutUpdated) {
+            lastParams = params
+        }
+        updateFullWidthAvailability()
+    }
+
+    /** Keep Compose and the inset listener gated on the applied layout contract, not reflection. */
+    private fun updateFullWidthAvailability() {
+        val params = lastParams
+        screenWidthCoordinates.value = params?.width == WindowManager.LayoutParams.MATCH_PARENT && params?.x == 0
+        val available = isTouchableRegionSupported.value &&
+            params?.width == WindowManager.LayoutParams.MATCH_PARENT &&
+            params?.height == WindowManager.LayoutParams.MATCH_PARENT &&
+            params?.x == 0 &&
+            params?.y == 0
+        if (fullWidthIsAvailable.value != available) {
+            fullWidthIsAvailable.value = available
         }
     }
 
@@ -1684,6 +1742,7 @@ class SmartIslandOverlayService : AccessibilityService() {
         // even when an OEM WindowManager throws while detaching an already-removed view.
         islandView = null
         lastParams = null
+        fullWidthIsAvailable.value = false
         isWindowExpanded = false
         collapseJob?.cancel()
         collapseJob = null

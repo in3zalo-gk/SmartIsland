@@ -12,6 +12,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -35,6 +36,7 @@ import com.agupta07505.smartisland.data.LaunchableApp
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.model.IslandMode
 import com.agupta07505.smartisland.model.IslandNotification
+import com.agupta07505.smartisland.model.PetMood
 import com.agupta07505.smartisland.model.SwipeAction
 import com.agupta07505.smartisland.util.HapticKind
 import com.agupta07505.smartisland.util.HapticStrength
@@ -108,7 +110,18 @@ fun IslandOverlayView(
     widgetIslandOpen: Boolean = false,
     onWidgetIslandChange: (Boolean) -> Unit = {},
     onWidgetIslandShownChange: (Boolean) -> Unit = {},
-    widgetIslandSnap: Int = 0
+    widgetIslandSnap: Int = 0,
+    /** Kept opt-in: existing installs must not gain a pet until it is explicitly enabled. */
+    enablePet: Boolean = false,
+    petMood: PetMood = PetMood.Idle,
+    petColor: Long = 0xFFFF7043L,
+    /** True for the in-island preference and for the OEM fallback when a floating layer is unavailable. */
+    renderPetInsideIsland: Boolean = false,
+    onPetTap: () -> Unit = {},
+    onPetDragStart: () -> Unit = {},
+    onPetDrag: (Float, Float) -> Unit = { _, _ -> },
+    onPetDragEnd: () -> Unit = {},
+    onPetDragCancel: () -> Unit = {}
 ) {
     val safeIndex = selectedIndex.coerceIn(0, (notifications.size - 1).coerceAtLeast(0))
     // Gesture code (pointerInput(Unit) never restarts its coroutine) reads these instead of capturing the parameters.
@@ -445,7 +458,7 @@ fun IslandOverlayView(
         Box(
             modifier = Modifier
                 .graphicsLayer { alpha = if (ui.widgetIslandCovers() && !expanded) 0f else 1f }
-                .islandPillSurface(settings.forCard(mediaShell), layout, secondary, pillExit, switchScaleAnim, cb, ui, squareTop, pickerSideBySide, twoIslandsDrawn, { mediaShellOpacity.value }, reportBounds = surfaceBack, shellHidden = { closingOntoIdle() || FaceIdShell.covering }, palette = palette)
+                .islandPillSurface(settings.forCard(mediaShell), layout, secondary, pillExit, switchScaleAnim, cb, ui, squareTop, pickerSideBySide, twoIslandsDrawn, { mediaShellOpacity.value }, reportBounds = surfaceBack, shellHidden = { closingOntoIdle() || FaceIdShell.covering }, palette = palette, communityEvent = activeNotification?.mode ?: IslandMode.Empty)
                 .islandMainGestures(
                     settings = settings,
                     isInputActive = isInputActive,
@@ -518,6 +531,27 @@ fun IslandOverlayView(
                 ui = ui,
                 animSpeed = settings.animationSpeed(isLandscape)
             )
+
+            // The upstream shell may clip descendants while it animates. This is the safe OEM fallback
+            // when a screen-coordinate companion cannot be hosted; it remains hidden while collapsed.
+            if (enablePet && renderPetInsideIsland && expanded && layout.expandedAlpha > 0.1f) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 10.dp, top = 6.dp)
+                        .graphicsLayer { alpha = layout.expandedAlpha }
+                ) {
+                    IslandPetComposable(
+                        mood = petMood,
+                        petColor = petColor,
+                        onTap = onPetTap,
+                        onDragStart = onPetDragStart,
+                        onDrag = onPetDrag,
+                        onDragEnd = onPetDragEnd,
+                        onDragCancel = onPetDragCancel
+                    )
+                }
+            }
 
             // A small white handle at the bottom of the expanded island: pull it down to open the notification in a floating window.
             FloatingWindowHandle(

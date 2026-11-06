@@ -11,6 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -31,7 +33,10 @@ fun OverlayIsland(
     onOpenFloatingWindow: () -> Unit,
     onOpenNotificationShade: () -> Unit = {},
     modifier: Modifier = Modifier,
-    isFullWidth: Boolean = true
+    isFullWidth: Boolean = true,
+    // Only true after the service has a live, screen-rooted pass-through frame.
+    // Otherwise the explicit in-island preference remains the safe fallback.
+    allowFloatingPet: Boolean = false
 ) {
     val shadeOpen by viewModel.shadeOpen.collectAsState()
     val idleSuppressed by viewModel.idleWidgetsSuppressed.collectAsState()
@@ -54,6 +59,7 @@ fun OverlayIsland(
     val landscapeDot by viewModel.idleDot.collectAsState()
     val widgetPill by viewModel.landscapeWidgetPill.collectAsState()
     val tickHold by viewModel.tickHold.collectAsState()
+    val petState by viewModel.petState.collectAsState()
     val idleClosing by viewModel.idleClosing.collectAsState()
     val idleLeaving by viewModel.idleLeaving.collectAsState()
     val rotationHidden by viewModel.rotationVeil.collectAsState()
@@ -201,6 +207,7 @@ fun OverlayIsland(
                 pickerOnLeft = pickerOnLeft
             )
     ) {
+    Box(modifier = modifier.fillMaxSize()) {
     IslandOverlayView(
         settings = settings,
         expanded = expanded && !quiet,
@@ -268,9 +275,24 @@ fun OverlayIsland(
         onWidgetIslandChange = { viewModel.setWidgetIslandOpen(it) },
         onWidgetIslandShownChange = { viewModel.widgetIslandShown.value = it },
         widgetIslandSnap = widgetIslandSnap,
-        modifier = modifier.graphicsLayer {
+        enablePet = settings.enablePet,
+        petMood = petState.mood,
+        petColor = settings.petColor,
+        // OEMs without a full-screen pass-through frame fall back to the expanded island.
+        renderPetInsideIsland = settings.petInsideIsland || !allowFloatingPet,
+        onPetTap = { viewModel.setPetMood(com.agupta07505.smartisland.model.PetMood.Tapped) },
+        onPetDragStart = viewModel::startPetDrag,
+        onPetDrag = viewModel::dragPetBy,
+        onPetDragEnd = viewModel::endPetDrag,
+        onPetDragCancel = viewModel::cancelPetDrag,
+        modifier = Modifier.graphicsLayer {
             alpha = com.agupta07505.smartisland.model.RotationVeil.alpha(veilVisible.value)
         }
     )
+    // Keep free-floating pets outside IslandOverlayView so upstream's animated surface cannot clip them.
+    if (settings.enablePet && !settings.petInsideIsland && allowFloatingPet) {
+        FloatingPetOverlay(viewModel = viewModel, mood = petState.mood, petColor = settings.petColor)
+    }
+    }
     }
 }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_principal">Main</string>
+    <string name="tab_layout">Layout</string>
+    <string name="tab_community">Community</string>
+    <string name="nav_group_events">Controls and live activities</string>
+    <string name="nav_group_features">Island features</string>
+    <string name="nav_group_demo">Preview and demo</string>
+    <string name="nav_group_visual">Appearance and colours</string>
+    <string name="nav_group_layout">Position and layout</string>
+    <string name="nav_color_studio_subtitle">Colours, opacity, gradients and card styles</string>
+    <string name="nav_font_summary">Typography and font mixing</string>
+    <string name="nav_glance_title">Glance · summary and routines</string>
+    <string name="nav_glance_subtitle">Summary, calendar, water and prayer</string>
+    <string name="nav_pet_subtitle">Your island companion</string>
+    <string name="nav_notifications_subtitle">Apps, events and lock-screen privacy</string>
+    <string name="nav_history_subtitle">Notifications shown by the island</string>
+    <string name="nav_shortcuts_subtitle">Launch favourite apps from the island</string>
+    <string name="nav_gestures_subtitle">Swipes, taps, long press and vibration</string>
+    <string name="nav_idle_subtitle">Widgets shown when the island is idle</string>
+    <string name="nav_timing_subtitle">Timing and duration of island content</string>
+</resources>

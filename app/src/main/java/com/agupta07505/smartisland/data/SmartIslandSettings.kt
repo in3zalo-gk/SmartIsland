@@ -8,6 +8,8 @@
 package com.agupta07505.smartisland.data
 
 import com.agupta07505.smartisland.util.CustomFonts
+import com.agupta07505.smartisland.model.IslandSkin
+import com.agupta07505.smartisland.model.IslandSkinPalette
 import com.agupta07505.smartisland.util.AnimationSpeed
 import com.agupta07505.smartisland.util.MergeStyle
 import com.agupta07505.smartisland.util.GestureSensitivity
@@ -17,6 +19,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class SmartIslandSettings(
+    /** Validated community-skin JSON; empty means use the built-in appearance. */
+    val communitySkinJson: String = "",
     val enabled: Boolean = false,
     val width: Float = 112f,
     val height: Float = 34f,
@@ -159,6 +163,13 @@ data class SmartIslandSettings(
     // Long press on the collapsed pill. One real action (hide / show the pill) or "None" to turn it off.
     val longPressAction: String = "TogglePill",
     val circlePosition: String = CIRCLE_POSITION_RIGHT,
+    val enablePet: Boolean = false,
+    val petColor: Long = 0xFFFF7043L,
+    val petInsideIsland: Boolean = true,
+    /** Stored as stable catalog values for backup compatibility. */
+    val islandSkin: IslandSkin = IslandSkin.Default,
+    val islandSkinPalette: IslandSkinPalette = IslandSkinPalette.Default,
+    val islandSkinAnimationsEnabled: Boolean = true,
     /**
      * Portrait collapsed cutout with content (a card on the pill): true keeps the idle cutout's size; false stretches
      * the pill to [contentPillWidthPercent] of its idle width when a card arrives and shrinks it back when the card
@@ -425,6 +436,7 @@ data class SmartIslandSettings(
         root.put("exportTimestamp", System.currentTimeMillis())
 
         val settingsObj = JSONObject()
+        settingsObj.put("communitySkinJson", communitySkinJson.take(24 * 1024))
         settingsObj.put("enabled", enabled)
         settingsObj.put("width", width.toDouble())
         settingsObj.put("height", height.toDouble())
@@ -547,6 +559,12 @@ data class SmartIslandSettings(
         settingsObj.put("pillSwipeRightAction", pillSwipeRightAction)
         settingsObj.put("longPressAction", longPressAction)
         settingsObj.put("circlePosition", circlePosition)
+        settingsObj.put("enablePet", enablePet)
+        settingsObj.put("petColor", petColor)
+        settingsObj.put("petInsideIsland", petInsideIsland)
+        settingsObj.put("islandSkin", islandSkin.storageValue)
+        settingsObj.put("islandSkinPalette", islandSkinPalette.storageValue)
+        settingsObj.put("islandSkinAnimationsEnabled", islandSkinAnimationsEnabled)
         settingsObj.put("landscapeShape", landscapeShape)
         settingsObj.put("landscapeWidth", landscapeWidth.toDouble())
         settingsObj.put("landscapeHeight", landscapeHeight.toDouble())
@@ -870,6 +888,7 @@ data class SmartIslandSettings(
             }
 
             return SmartIslandSettings(
+                communitySkinJson = obj.optString("communitySkinJson", "").take(24 * 1024).takeIf { com.agupta07505.smartisland.model.CommunitySkinParser.parse(it).isSuccess } ?: "",
                 enabled = obj.optBoolean("enabled", defaults.enabled),
                 width = safeFloat("width", defaults.width, MIN_WIDTH, MAX_WIDTH),
                 height = safeFloat("height", defaults.height, MIN_HEIGHT, MAX_HEIGHT),
@@ -989,6 +1008,12 @@ data class SmartIslandSettings(
                 circlePosition = obj.optString("circlePosition", defaults.circlePosition).let {
                     if (it == CIRCLE_POSITION_LEFT || it == CIRCLE_POSITION_RIGHT) it else defaults.circlePosition
                 },
+                enablePet = obj.optBoolean("enablePet", defaults.enablePet),
+                petColor = safeColor("petColor", defaults.petColor),
+                petInsideIsland = obj.optBoolean("petInsideIsland", defaults.petInsideIsland),
+                islandSkin = IslandSkin.fromStorage(obj.optString("islandSkin", defaults.islandSkin.storageValue)),
+                islandSkinPalette = IslandSkinPalette.fromStorage(obj.optString("islandSkinPalette", defaults.islandSkinPalette.storageValue)),
+                islandSkinAnimationsEnabled = obj.optBoolean("islandSkinAnimationsEnabled", defaults.islandSkinAnimationsEnabled),
                 landscapeShape = obj.optString("landscapeShape", defaults.landscapeShape).let {
                     if (it == LANDSCAPE_SHAPE_PILL || it == LANDSCAPE_SHAPE_CIRCLE) it else defaults.landscapeShape
                 },

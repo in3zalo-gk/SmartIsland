@@ -16,7 +16,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import com.agupta07505.smartisland.data.SmartIslandSettings
+import com.agupta07505.smartisland.model.CommunitySkinParser
+import com.agupta07505.smartisland.util.SystemAnimScale
 import com.agupta07505.smartisland.ui.expanded.IslandPalette
 import com.agupta07505.smartisland.ui.expanded.expandedGradientBrush
 
@@ -24,6 +28,7 @@ import com.agupta07505.smartisland.ui.expanded.expandedGradientBrush
  * The visible island shell: animated size, the finger-follow and merge swell transform, shadow, clip, the
  * expanded-surface bounds report (for the touch region), and the background surface. Gestures are added by the caller.
  */
+@Composable
 internal fun Modifier.islandPillSurface(
     settings: SmartIslandSettings,
     layout: IslandLayout,
@@ -52,8 +57,32 @@ internal fun Modifier.islandPillSurface(
      */
     shellHidden: () -> Boolean = { false },
     /** The look of the expanded island (light or dark). */
-    palette: IslandPalette = IslandPalette.Dark
-): Modifier = this
+    palette: IslandPalette = IslandPalette.Dark,
+    /** The selected upstream event; its skin-state mapping stays with the shell that renders it. */
+    communityEvent: com.agupta07505.smartisland.model.IslandMode = com.agupta07505.smartisland.model.IslandMode.Empty
+): Modifier {
+    // JSON parsing is keyed only to its persisted value, never animation-driven recomposition.
+    val communityState = when (communityEvent) {
+        com.agupta07505.smartisland.model.IslandMode.Music -> "music"
+        com.agupta07505.smartisland.model.IslandMode.Notification -> "notification"
+        com.agupta07505.smartisland.model.IslandMode.IncomingCall -> "call"
+        com.agupta07505.smartisland.model.IslandMode.Battery -> "battery"
+        com.agupta07505.smartisland.model.IslandMode.LiveActivity -> "live_activity"
+        com.agupta07505.smartisland.model.IslandMode.Navigation -> "navigation"
+        com.agupta07505.smartisland.model.IslandMode.DownloadUpload -> "transfer"
+        com.agupta07505.smartisland.model.IslandMode.Hotspot -> "hotspot"
+        com.agupta07505.smartisland.model.IslandMode.Bluetooth -> "bluetooth"
+        com.agupta07505.smartisland.model.IslandMode.Flashlight -> "flashlight"
+        com.agupta07505.smartisland.model.IslandMode.ScreenRecording, com.agupta07505.smartisland.model.IslandMode.AudioRecording -> "screen_recording"
+        com.agupta07505.smartisland.model.IslandMode.Timer -> "timer"
+        com.agupta07505.smartisland.model.IslandMode.Stopwatch -> "stopwatch"
+        else -> "idle"
+    }
+    val communitySkin = remember(settings.communitySkinJson) {
+        settings.communitySkinJson.takeIf { it.isNotBlank() }?.let { CommunitySkinParser.parse(it).getOrNull() }
+    }
+    val skinAnimated = settings.islandSkinAnimationsEnabled && !SystemAnimScale.animationsOff()
+    return this
         .islandAnimatedSize({
             // Landscape split: the shell's width is a direct function of the split progress (model/SplitShell.kt), so
             // at progress 0 it is the single island and the card island fills it.
@@ -184,9 +213,14 @@ internal fun Modifier.islandPillSurface(
             // swap are one card apart, so there is no strip of bare shell to cover: the shell keeps its own opacity.
             alpha = { shellOpacity() * layout.singleSurfaceAlpha }
         )
+        .then(
+            if (communitySkin != null) Modifier.communitySkin(communitySkin, communityState, reducedMotion = !skinAnimated)
+            else Modifier.islandSkin(settings.islandSkin, settings.islandSkinPalette, animated = skinAnimated)
+        )
         .lockCueOutline(
             shape = { islandShellShape(layout.safeRadius.toPx(), squareTop) },
             cue = { ui.lockCue.value },
             // A white outline would vanish on the light island.
             color = if (palette.isLight) androidx.compose.ui.graphics.Color.Black else androidx.compose.ui.graphics.Color.White
         )
+}

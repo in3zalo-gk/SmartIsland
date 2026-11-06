@@ -1,0 +1,1 @@
+{"version":1,"id":"saturn","name":"Saturn","author":"Smart Island project","license":"GPL-3.0-or-later","baseStyle":"saturn","states":{"idle":{"colors":["#F4C56A","#C77A42","#7E4A2F"],"animation":{"type":"orbit","speed":0.35}}}}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Smart Island (2026) | © Animesh Gupta | GNU GPL v3. Do not remove or alter this notice. -->
+<resources>
+<string name="pet_preview_title">Mascote da Ilha</string><string name="pet_preview_description">Escolha uma aparência para a prévia do mascote. Ela reage apenas aqui e nunca aciona eventos do sistema.</string><string name="pet_preview_choose_state">Estado da prévia</string><string name="pet_preview_showing_state">Exibindo: %1$s</string><string name="pet_preview_local_only">As alterações da prévia ficam nesta tela e não são salvas como estados do mascote.</string><string name="pet_preview_content_description">Prévia do mascote, atualmente %1$s. Toque para mostrar a reação ao toque.</string><string name="pet_preview_tap_action">Mostrar reação ao toque</string>
+<string name="pet_preview_mood_idle">Parado</string><string name="pet_preview_mood_happy">Feliz</string><string name="pet_preview_mood_excited">Animado</string><string name="pet_preview_mood_sleeping">Dormindo</string><string name="pet_preview_mood_charging">Carregando</string><string name="pet_preview_mood_music">Ouvindo música</string><string name="pet_preview_mood_low_battery">Bateria fraca</string><string name="pet_preview_mood_tapped">Tocado</string>
+</resources>

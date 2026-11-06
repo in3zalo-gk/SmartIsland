@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,8 +76,11 @@ import com.agupta07505.smartisland.R
 import com.agupta07505.smartisland.data.ExpandedBlurMode
 import com.agupta07505.smartisland.data.SmartIslandSettings
 import com.agupta07505.smartisland.data.SmartIslandSettingsRepository
+import com.agupta07505.smartisland.model.IslandSkin
+import com.agupta07505.smartisland.model.IslandSkinPalette
 import com.agupta07505.smartisland.ui.SliderSettingItem
 import com.agupta07505.smartisland.ui.bounceClick
+import com.agupta07505.smartisland.ui.islandSkin
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import androidx.compose.runtime.getValue
@@ -544,6 +548,130 @@ fun CustomizationsSection(
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun IslandSkinCatalogCard(
+    settings: SmartIslandSettings,
+    repository: SmartIslandSettingsRepository
+) {
+    val scope = rememberCoroutineScope()
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "SKINS DA ILHA",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 0.8.sp
+            )
+            Text(
+                text = "Estilos locais desenhados pelo Smart Island.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IslandSkin.entries.forEach { skin ->
+                    IslandSkinCatalogItem(
+                        skin = skin,
+                        palette = settings.islandSkinPalette,
+                        selected = skin == settings.islandSkin,
+                        animated = settings.islandSkinAnimationsEnabled,
+                        onClick = { scope.launch { repository.setIslandSkin(skin) } }
+                    )
+                }
+            }
+            Text(
+                text = "PALETA",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 0.8.sp
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IslandSkinPalette.entries.forEach { palette ->
+                    val selected = palette == settings.islandSkinPalette
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f), RoundedCornerShape(10.dp))
+                            .bounceClick { scope.launch { repository.setIslandSkinPalette(palette) } }
+                            .padding(horizontal = 9.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        palette.colors.forEach { color ->
+                            Box(Modifier.size(9.dp).clip(CircleShape).background(Color(color)))
+                        }
+                        Text(palette.displayName, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Animações de skin", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Desative para usar apenas a versão estática.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(
+                    checked = settings.islandSkinAnimationsEnabled,
+                    onCheckedChange = { enabled -> scope.launch { repository.setIslandSkinAnimationsEnabled(enabled) } }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun IslandSkinCatalogItem(
+    skin: IslandSkin,
+    palette: IslandSkinPalette,
+    selected: Boolean,
+    animated: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = Modifier
+            .width(116.dp)
+            .clip(shape)
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f))
+            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.40f), shape)
+            .bounceClick(onClick)
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(34.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .background(Color.Black)
+                .islandSkin(skin, palette, animated)
+        )
+        Text(skin.displayName, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(skin.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, lineHeight = 12.sp)
     }
 }
 

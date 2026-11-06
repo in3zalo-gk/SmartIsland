@@ -1,0 +1,1 @@
+{"version":1,"id":"titanium","name":"Titanium","author":"Smart Island project","license":"GPL-3.0-or-later","baseStyle":"titanium","states":{"idle":{"colors":["#17191D","#5A6068","#C7CDD4"],"animation":{"type":"none","speed":1}}}}

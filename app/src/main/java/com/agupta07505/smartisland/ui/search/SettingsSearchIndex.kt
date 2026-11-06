@@ -533,5 +533,16 @@ internal fun buildSettingsSearchIndex(str: (Int) -> String): List<SettingsSearch
         listOf("developer", "debug", "dev", "logs", "options", "mock", "test")
     )
 
+    add(
+        "pet.screen", "Island Pet", detail(FeatureDetailSection.PetSettings), home, Icons.Rounded.Face,
+        str(R.string.nav_pet_subtitle),
+        listOf("pet", "mascote", "mascot", "gato", "cat", "skins", "drag", "arrastar")
+    )
+    add(
+        "glance.screen", str(R.string.nav_glance_title), detail(FeatureDetailSection.GlanceStudio), home,
+        Icons.Rounded.Palette, str(R.string.nav_glance_subtitle),
+        listOf("glance", "resumo", "rotinas", "routines", "context", "contexto", "agenda")
+    )
+
     return out
 }
